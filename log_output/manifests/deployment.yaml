@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-output-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logoutput
+  template:
+    metadata:
+      labels:
+        app: logoutput
+    spec:
+      containers:
+        - name: logoutput
+          image: pjmartin/log_output:sha256:9bd54eb6681b9a9b217164b17ccc8c2e87086485c81fa06935e6c9f979a81e6c
