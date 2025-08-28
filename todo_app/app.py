@@ -23,8 +23,8 @@ APP_HASH = generate_random_string(6)
 
 @app.route('/')
 def home():
-    home_return_string = "<strong>App instance hash:</strong> {0}<br>".format(APP_HASH)
-    home_return_string += "<strong>User request hash:</strong> {0}\n".format(generate_random_string(6))
+    home_return_string = f"<strong>App instance hash:</strong> {APP_HASH}<br>"
+    home_return_string += f"<strong>User request hash:</strong> {generate_random_string(6)}\n"
     return home_return_string
 
 # Default port:
