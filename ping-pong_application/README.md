@@ -176,3 +176,42 @@ Events:
   Warning  Failed     7m6s (x6 over 8m50s)    kubelet            Error: ImagePullBackOff
   Normal   BackOff    3m39s (x21 over 8m50s)  kubelet            Back-off pulling image "pjmartin/pingpong:1.9"
 ```
+
+Did some changes so both pingpong and log_output service use the same ClusterIP port since they do not need to be unique like NodePort.
+
+```bash
+➜ k describe service log-output-svc
+Name:                     log-output-svc
+Namespace:                default
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=logoutput
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.43.234.171
+IPs:                      10.43.234.171
+Port:                     <unset>  2345/TCP
+TargetPort:               3000/TCP
+Endpoints:                10.42.3.6:3000
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+➜ k describe service ping-pong-svc
+Name:                     ping-pong-svc
+Namespace:                default
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=pingpong
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.43.143.29
+IPs:                      10.43.143.29
+Port:                     http  2346/TCP
+TargetPort:               3000/TCP
+Endpoints:                10.42.1.5:3000
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+```
