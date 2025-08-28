@@ -8,7 +8,7 @@
 
 ```bash
 ➜ k apply -f manifests/deployment.yaml
-deployment.apps/todo-app-deployment unchanged
+deployment.apps/todo-app-deployment created
 ➜ k apply -f manifests/service.yaml
 service/todo-app-svc created
 ➜ k get deployments.apps
