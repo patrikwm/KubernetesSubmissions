@@ -1,3 +1,8 @@
+# Networking in Kubernetes
+
+## Diagram of NodePort Service
+
+```bash
 Your Laptop
 +-----------------------------+
 |                             |
@@ -42,3 +47,51 @@ Your Laptop
                | listens   |
                | on 8081   |
                +-----------+
+```
+
+## Diagram of Ingress
+
+```bash
+Your Laptop
++----------------------------------+
+|                                  |
+|  curl http://localhost:8081/     |  # host 8081 -> k3d L7 entry
++----------------------------------+
+                 |
+                 v
+          hostPort 8081
+                 |
++----------------+-----------------------------------+
+|             k3d containers (Docker)                |
+|                                                    |
+|  [k3d-k3s-default-serverlb] (loadbalancer)         |
+|      - forwards 8081 (host) -> 80 (cluster)        |
++----------------------------------------------------+
+                 |
+                 v
+           Cluster port :80
+                 |
++----------------------------------------------------+
+|        Kubernetes Cluster Network                   |
+|                                                     |
+|  Ingress Controller (e.g., Traefik in k3s)          |
+|    Ingress: log-output-ingress                      |
+|      - rule: path "/"                               |
+|      - backend: service log-output-svc:2345         |
+|                (type: ClusterIP)                    |
+|                    |                                |
+|                    v                                |
+|        Service: log-output-svc                      |
+|          - port: 2345 (cluster-facing)              |
+|          - targetPort: 3000 (Pod port)              |
++----------------------------------------------------+
+                           |
+                           v
+                     +-----------------------+
+                     | Pod from Deployment   |
+                     |   name: log-output-…  |
+                     |   app: logoutput      |
+                     |   container: logoutput|
+                     |   listens on :3000    |
+                     +-----------------------+
+```
