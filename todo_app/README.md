@@ -1,28 +1,29 @@
 # Chapter 2
 
-# 1.6. The project, step 4
-
-| ⚠️ **Note** |
-|-------------|
-| Since the cluster has been redeployed, you must redeploy the `deployment.yaml` before applying the `service.yaml`. |
+# 1.8. The project, step 5
 
 ```bash
 ➜ k apply -f manifests/deployment.yaml
-deployment.apps/todo-app-deployment created
+deployment.apps/todo-app-deployment unchanged
 ➜ k apply -f manifests/service.yaml
-service/todo-app-svc created
-➜ k get deployments.apps
-NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
-hashresponse-dep      1/1     1            1           90m
-todo-app-deployment   1/1     1            1           88s
+service/todo-app-svc configured
 ➜ k get service
-NAME           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-kubernetes     ClusterIP   10.43.0.1       <none>        443/TCP          92m
-todo-app-svc   NodePort    10.43.168.211   <none>        1234:30080/TCP   16s
-➜ docker ps -a |grep 8082
-f9b58a889da0   ghcr.io/k3d-io/k3d-proxy:5.8.3   "/bin/sh -c nginx-pr…"   2 hours ago   Up 2 hours   0.0.0.0:8081->80/tcp, [::]:8081->80/tcp, 0.0.0.0:63496->6443/tcp, 0.0.0.0:8082->30080/tcp, [::]:8082->30080/tcp   k3d-k3s-default-serverlb
-➜ curl localhost:8082
-<strong>App instance hash:</strong> NptmnR<br><strong>User request hash:</strong> gm69dW
-➜ todo_app ⚡( 10-exercise-16-the-project-step-4)                                                                                        3.10.13 2 hours ago
+NAME           TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
+kubernetes     ClusterIP   10.43.0.1     <none>        443/TCP    177m
+todo-app-svc   ClusterIP   10.43.72.91   <none>        2345/TCP   52m
+➜ k apply -f manifests/ingress.yaml
+Error from server (BadRequest): error when creating "manifests/ingress.yaml": Ingress in version "v1" cannot be handled as a Ingress: json: cannot unmarshal string into Go struct field HTTPIngressRuleValue.spec.rules.http.paths of type []v1.HTTPIngressPath
+➜ k apply -f manifests/ingress.yaml
+Error from server (BadRequest): error when creating "manifests/ingress.yaml": Ingress in version "v1" cannot be handled as a Ingress: strict decoding error: unknown field "spec.rules[0].http.backend", unknown field "spec.rules[0].http.path", unknown field "spec.rules[0].http.type"
+➜ k apply -f manifests/ingress.yaml
+Error from server (BadRequest): error when creating "manifests/ingress.yaml": Ingress in version "v1" cannot be handled as a Ingress: strict decoding error: unknown field "spec.rules[0].http.backend", unknown field "spec.rules[0].http.path", unknown field "spec.rules[0].http.pathType"
+➜ k apply -f manifests/ingress.yaml
+ingress.networking.k8s.io/todo-app-ingress created
+
+➜ date && curl localhost:8081 && k logs todo-app-deployment-bd879fdf5-ltjtw| tail -2
+Thu Aug 28 14:10:16 CEST 2025
+<strong>App instance hash:</strong> 1T2Rpy<br><strong>User request hash:</strong> 7vJ3nj
+2025-08-28 12:09:26,872 - INFO - 10.42.3.3 - - [28/Aug/2025 12:09:26] "GET / HTTP/1.1" 200 -
+2025-08-28 12:10:16,261 - INFO - 10.42.3.3 - - [28/Aug/2025 12:10:16] "GET / HTTP/1.1" 200 -
 ▶
 ```
