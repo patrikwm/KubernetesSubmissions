@@ -54,7 +54,7 @@ def get_status():
     except FileNotFoundError:
         return f"Could not find logfile {LOG_FILE}"
     result = f"<h1>HTTP Server ID: {initial_string}</h1><br>"
-    for line in LOG_LINES:
+    for line in LOG_LINES[-10:]:
         result += f"{line}<br>"
     return result
 

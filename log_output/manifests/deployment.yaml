@@ -18,7 +18,7 @@ spec:
           sizeLimit: 20Mi
       containers:
         - name: log-reader
-          image: pjmartin/log-reader:1.10
+          image: pjmartin/log-reader:1.10.1
           ports:
             - name: http
               containerPort: 3000
