@@ -12,6 +12,30 @@ spec:
       labels:
         app: logoutput
     spec:
+      volumes:
+      - name: log-output
+        emptyDir:
+          sizeLimit: 20Mi
       containers:
-        - name: logoutput
-          image: pjmartin/log_output:1.7
+        - name: log-reader
+          image: pjmartin/log-reader:1.10
+          ports:
+            - name: http
+              containerPort: 3000
+          imagePullPolicy: Always
+          env:
+            - name: LOG_FILE
+              value: "/app/logs/log_output.log"
+          volumeMounts:
+            - name: log-output
+              mountPath: /app/logs
+
+        - name: log-writer
+          image: pjmartin/log-writer:1.10
+          imagePullPolicy: Always
+          env:
+            - name: LOG_FILE
+              value: "/app/logs/log_output.log"
+          volumeMounts:
+            - name: log-output
+              mountPath: /app/logs
