@@ -3,8 +3,7 @@ FROM python:3.10.13-slim
 WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-COPY . .
+COPY log-writer.py log-writer.py
 
-EXPOSE 3000
 
-CMD ["python", "app.py"]
+CMD ["python", "log-writer.py"]
