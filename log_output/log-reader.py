@@ -51,7 +51,7 @@ def get_status():
     try:
         with open(f"{LOG_FILE}", "r") as f:
             LOG_LINES = f.readlines()
-    except Exception:
+    except FileNotFoundError:
         return f"Could not find logfile {LOG_FILE}"
     result = f"<h1>HTTP Server ID: {initial_string}</h1><br>"
     for line in LOG_LINES:
