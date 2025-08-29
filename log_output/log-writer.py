@@ -2,16 +2,16 @@
 import random
 import logging
 import string
-import threading
+import os
 from time import sleep
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
 
-app = Flask(__name__)
-FLASK_PORT = 3000
+LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
 
-logging.basicConfig(
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(filename=f"{LOG_FILE}", encoding='utf-8',
         format="%(asctime)s - %(levelname)s - %(message)s",
         level=logging.INFO
     )
@@ -31,27 +31,6 @@ def get_current_timestamp():
     now = datetime.now(timezone.utc)
     return now.strftime("%Y-%m-%dT%H:%M:%S") + f".{now.microsecond // 1000:03d}Z"
 
-def log_output_loop():
-    """Background thread that continuously generates and logs random strings."""
-    while True:
-        random_string = generate_random_string()
-        timestamp = get_current_timestamp()
-
-        # Update global status
-        current_status["timestamp"] = timestamp
-        current_status["random_string"] = random_string
-
-        # Log to stdout
-        print(f"{timestamp}: - {random_string}", flush=True)
-        sleep(5)
-
-@app.route('/')
-def get_status():
-    """Endpoint to get the current status (timestamp and random string)."""
-    return jsonify({
-        "timestamp": current_status["timestamp"],
-        "random_string": current_status["random_string"]
-    })
 
 if __name__ == '__main__':
     # Generate initial random string
@@ -59,11 +38,14 @@ if __name__ == '__main__':
     initial_timestamp = get_current_timestamp()
     current_status["timestamp"] = initial_timestamp
     current_status["random_string"] = initial_string
+    logging.info(f"Server started with hash {initial_string}")
 
     # Start the background logging thread
-    log_thread = threading.Thread(target=log_output_loop, daemon=True)
-    log_thread.start()
+    while True:
+        current_status["timestamp"] = get_current_timestamp()
+        current_status["random_string"] = generate_random_string()
+        print(f"""{current_status["timestamp"]} - {current_status["random_string"]}""", flush=True)
+        logging.info(f'server id: {initial_string} - hash: {current_status["random_string"]}')
+        sleep(5)
 
-    logging.info("Server started in port {0}".format(FLASK_PORT))
-    logging.info("Initial random string: {0}".format(initial_string))
-    app.run(host='0.0.0.0', port=FLASK_PORT)
+
