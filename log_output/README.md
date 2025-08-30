@@ -1,8 +1,23 @@
+
 # Chapter 2
+
+
+## Table of Contents
+
+- [1.10. Even more services](#110-even-more-services)
+	- [Create a shared Persistent Volume](#create-a-shared-persistent-volume)
+	- [Mount PVC to log reader and writer applications](#mount-pvc-to-log-reader-and-writer-applications)
+	- [change persistentVolumeClaim.name to persistentVolumeClaim.claimName](#change-persistentvolumeclaimname-to-persistentvolumeclaimclaimname)
+	- [Mount PVC to Pingpong application](#mount-pvc-to-pingpong-application)
+	- [Update Todo app path](#update-todo-app-path)
+	- [Verify everything is working](#verify-everything-is-working)
+
 
 ## 1.10. Even more services
 
+
 ### Create a shared Persistent Volume
+
 ```bash
 ➜ k apply -f manifests/infra/agent-0
 persistentvolume/agent-0-pv created
@@ -25,9 +40,12 @@ The request is invalid: patch: Invalid value: "map[metadata:map[annotations:map[
 
 ➜ k apply -f log_output/manifests/deployment.yaml --validate=true
 The request is invalid: patch: Invalid value: "map[metadata:map[annotations:map[kubectl.kubernetes.io/last-applied-configuration:{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"name\":\"log-output-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"logoutput\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"logoutput\"}},\"spec\":{\"containers\":[{\"env\":[{\"name\":\"LOG_FILE\",\"value\":\"/app/logs/log_output.log\"}],\"image\":\"pjmartin/log-reader:1.10.1\",\"imagePullPolicy\":\"Always\",\"name\":\"log-reader\",\"ports\":[{\"containerPort\":3000,\"name\":\"http\"}],\"volumeMounts\":[{\"mountPath\":\"/app/logs\",\"name\":\"log-output\"}]},{\"env\":[{\"name\":\"LOG_FILE\",\"value\":\"/app/logs/log_output.log\"}],\"image\":\"pjmartin/log-writer:1.10\",\"imagePullPolicy\":\"Always\",\"name\":\"log-writer\",\"volumeMounts\":[{\"mountPath\":\"/app/logs\",\"name\":\"log-output\"}]}],\"volumes\":[{\"name\":\"log-output\",\"persistentVolumeClaim\":{\"name\":\"shared-volume-claim-0\"}}]}}}}\n]] spec:map[template:map[spec:map[]]]]": strict decoding error: unknown field "spec.template.spec.volumes[0].persistentVolumeClaim.name"
+```
 
-➜ k apply -f log_output/manifests/deployment.yaml #change name to claimName and it worked.
-deployment.apps/log-output-deployment configured
+## change persistentVolumeClaim.name to persistentVolumeClaim.claimName
+
+```bash
+➜ k apply -f log_output/manifests/deployment.yaml
 
 ➜ curl localhost:8081/
 <h1>HTTP Server ID: 0C38FTMZYo</h1><br>2025-08-29 15:50:53,076 - INFO - Server started with hash 7q6dYSHuVu
@@ -73,9 +91,11 @@ ping-pong-deployment   1/1     1            1           27h
 log_output.log
 ```
 
+### Update Todo app path
+
 Todo app path is colliding with the log_output. I change the path to /todo and redeployed.
 
-````bash
+```bash
 ➜ docker build . --tag pjmartin/todo_app:1.11 --push
 [+] Building 7.1s (12/12) FINISHED                                                                                           docker:desktop-linux
  => [internal] load build definition from Dockerfile                                                                                         0.0s
@@ -110,4 +130,30 @@ View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux
 deployment.apps/todo-app-deployment configured
 ingress.networking.k8s.io/todo-app-ingress unchanged
 service/todo-app-svc unchanged
+```
+
+### Verify everything is working
+
+```bash
+➜ docker exec k3d-k3s-default-agent-0 ls /tmp/kube
+log_output.log
+ping-pong.log
+➜ docker exec k3d-k3s-default-agent-0 cat /tmp/kube/ping-pong.log
+2%
+➜ curl localhost:8081/pingpong
+pong 2%
+➜ curl localhost:8081/
+<h1>HTTP Server ID: L7GyACo74O</h1><br>Ping / Pongs: 3</br></br>2025-08-30 10:59:27,324 - INFO - server id: 4pJ1irCzU6 - hash: aOuadN9dyJ
+<br>2025-08-30 10:59:32,331 - INFO - server id: 4pJ1irCzU6 - hash: mRy7VMykI4
+<br>2025-08-30 10:59:37,333 - INFO - server id: 4pJ1irCzU6 - hash: 0bcGhvRmqG
+<br>2025-08-30 10:59:42,340 - INFO - server id: 4pJ1irCzU6 - hash: AK51dqkQeE
+<br>2025-08-30 10:59:47,347 - INFO - server id: 4pJ1irCzU6 - hash: sUDQRiYWBN
+<br>2025-08-30 10:59:52,352 - INFO - server id: 4pJ1irCzU6 - hash: yu4VKJielP
+<br>2025-08-30 10:59:57,361 - INFO - server id: 4pJ1irCzU6 - hash: 2Sftgv9F6f
+<br>2025-08-30 11:00:02,362 - INFO - server id: 4pJ1irCzU6 - hash: y6JqZ2tMWr
+<br>2025-08-30 11:00:07,370 - INFO - server id: 4pJ1irCzU6 - hash: eGQ3nFJ6WG
+<br>2025-08-30 11:00:12,379 - INFO - server id: 4pJ1irCzU6 - hash: u8kTE37Qc0
+<br>%
+➜ docker exec k3d-k3s-default-agent-0 cat /tmp/kube/ping-pong.log
+3%
 ```
