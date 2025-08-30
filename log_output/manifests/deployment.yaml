@@ -18,7 +18,7 @@ spec:
             claimName: shared-volume-claim-0
       containers:
         - name: log-reader
-          image: pjmartin/log-reader:1.10.1
+          image: pjmartin/log-reader:1.11.3
           ports:
             - name: http
               containerPort: 3000
@@ -26,6 +26,8 @@ spec:
           env:
             - name: LOG_FILE
               value: "/app/logs/log_output.log"
+            - name: PING_PONG_LOG_FILE
+              value: "/app/logs/ping-pong.log"
           volumeMounts:
             - name: log-output
               mountPath: /app/logs

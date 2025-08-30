@@ -14,8 +14,11 @@ spec:
     spec:
       containers:
         - name: todoapp
-          image: pjmartin/todo_app:1.5
+          ports:
+            - name: http
+              containerPort: 3000
+          image: pjmartin/todo_app:1.11
           imagePullPolicy: Always
           env:
             - name: PORT
-              value: "8081"
+              value: "3000"

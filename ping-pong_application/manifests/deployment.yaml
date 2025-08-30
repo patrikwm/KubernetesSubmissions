@@ -21,10 +21,10 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-          image: pjmartin/pingpong:1.9
+          image: pjmartin/pingpong:1.11
           volumeMounts:
             - name: ping-output
               mountPath: /app/logs
           env:
-            - name: LOG_PATH
+            - name: LOG_FILE
               value: "/app/logs/ping-pong.log"
