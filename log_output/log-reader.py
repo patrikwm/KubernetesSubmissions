@@ -11,15 +11,12 @@ from flask import Flask, jsonify
 app = Flask(__name__)
 FLASK_PORT = 3000
 LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
-
+PING_PONG_LOG_FILE = os.getenv("PING_PONG_LOG_FILE", "ping-pong.log")
 
 logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(message)s",
         level=logging.INFO
     )
-
-
-
 
 def generate_random_string(length=10):
     """Generate a random string of fixed length."""
@@ -48,12 +45,20 @@ logging.info("Initial random string: {0}".format(initial_string))
 @app.route('/')
 def get_status():
     """Endpoint to get the current status (timestamp and random string)."""
+    result = f"<h1>HTTP Server ID: {initial_string}</h1><br>"
+
+    try:
+        with open(f"{PING_PONG_LOG_FILE}", "r") as ping_pong_f:
+            LOG_LINES = ping_pong_f.readline()
+    except FileNotFoundError:
+        return f"{result}Could not find logfile {PING_PONG_LOG_FILE}"
+    result += f"Ping / Pongs: {LOG_LINES}</br></br>"
+
     try:
         with open(f"{LOG_FILE}", "r") as f:
             LOG_LINES = f.readlines()
     except FileNotFoundError:
-        return f"Could not find logfile {LOG_FILE}"
-    result = f"<h1>HTTP Server ID: {initial_string}</h1><br>"
+        return f"{result}Could not find logfile {LOG_FILE}"
     for line in LOG_LINES[-10:]:
         result += f"{line}<br>"
     return result

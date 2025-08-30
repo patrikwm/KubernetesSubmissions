@@ -1,3 +1,6 @@
 .venv
 INSTRUCTIONS.md
+
+# App files
 log_output.log
+ping-pong.log
