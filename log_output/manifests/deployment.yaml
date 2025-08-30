@@ -13,9 +13,9 @@ spec:
         app: logoutput
     spec:
       volumes:
-      - name: log-output
-        emptyDir:
-          sizeLimit: 20Mi
+        - name: log-output
+          persistentVolumeClaim:
+            claimName: shared-volume-claim-0
       containers:
         - name: log-reader
           image: pjmartin/log-reader:1.10.1
