@@ -21,7 +21,7 @@ def generate_random_string(length=10):
 
 APP_HASH = generate_random_string(6)
 
-@app.route('/')
+@app.route('/todo')
 def home():
     home_return_string = f"<strong>App instance hash:</strong> {APP_HASH}<br>"
     home_return_string += f"<strong>User request hash:</strong> {generate_random_string(6)}\n"
