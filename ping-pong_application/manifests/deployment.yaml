@@ -12,6 +12,19 @@ spec:
       labels:
         app: pingpong
     spec:
+      volumes:
+        - name: ping-output
+          persistentVolumeClaim:
+            claimName: shared-volume-claim-0
       containers:
         - name: pingpong
-          image: pjmartin/pingpong:1.9
+          ports:
+            - name: http
+              containerPort: 3000
+          image: pjmartin/pingpong:1.11
+          volumeMounts:
+            - name: ping-output
+              mountPath: /app/logs
+          env:
+            - name: LOG_FILE
+              value: "/app/logs/ping-pong.log"

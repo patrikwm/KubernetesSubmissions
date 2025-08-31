@@ -1,6 +1,6 @@
 # This application generates a random string and echoes it with a UTC timestamp to standard output.
 import logging
-from time import sleep
+import os
 from datetime import datetime, timezone
 
 from flask import Flask
@@ -14,14 +14,21 @@ logging.basicConfig(
     )
 
 PING_PONG_COUNTER = 0
-
+LOG_FILE = os.getenv("LOG_FILE", "ping-pong.log")
 @app.route('/pingpong')
 def get_status():
     """Endpoint to get the pingpong counter"""
     global PING_PONG_COUNTER
-    RESPONSE = f"pong {PING_PONG_COUNTER}"
+    result = f"pong {PING_PONG_COUNTER}"
     PING_PONG_COUNTER += 1
-    return RESPONSE
+
+    try:
+        with open(f"{LOG_FILE}", "w") as f:
+            f.write(f"{PING_PONG_COUNTER}")
+    except FileNotFoundError:
+        return f"Could not find logfile {LOG_FILE}"
+    return result
+
 
 if __name__ == '__main__':
     # Generate initial random string
