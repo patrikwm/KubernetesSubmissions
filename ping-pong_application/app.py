@@ -27,8 +27,6 @@ def get_status():
             f.write(f"{PING_PONG_COUNTER}")
     except FileNotFoundError:
         return f"Could not find logfile {LOG_FILE}"
-    finally:
-        f.close()
     return result
 
 
