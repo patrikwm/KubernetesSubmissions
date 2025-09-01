@@ -21,7 +21,7 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-          image: docker.io/pjmartin/todo_app:1.12@sha256:d5f6438318a34fdfba4e27549a091953108a95adf58608cb4287484de4678574
+          image: docker.io/pjmartin/todo_app:1.13@sha256:c9b2e2be2155ca0b158d0aaea9ce2bf3959a1fa80bdae3c13325d32fc53852d7
           volumeMounts:
             - name: shared
               mountPath: /app/data

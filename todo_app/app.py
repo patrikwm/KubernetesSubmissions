@@ -8,6 +8,8 @@ app = Flask(__name__)
 
 # --- config (change only if you want) ---
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "./shared"))
+LOG_DIR = DATA_ROOT / "logs"
+APP_LOG_PATH = LOG_DIR / "todo-app.log"
 IMG_DIR = DATA_ROOT / "images"
 IMG_PATH = IMG_DIR / "image.jpg"
 TS_PATH  = IMG_DIR / ".ts"
@@ -21,15 +23,14 @@ log = logging.getLogger("todo-app-svc")
 
 def setup_file_logging():
     """Set up file logging to shared directory."""
-    log_dir = Path("/app/logs")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    app_log_path = log_dir / "todo-app.log"
-    file_handler = logging.FileHandler(app_log_path, encoding='utf-8')
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    file_handler = logging.FileHandler(APP_LOG_PATH, encoding='utf-8')
     file_handler.setLevel(logging.INFO)
     file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(file_formatter)
     log.addHandler(file_handler)
-    log.info("File logging enabled to %s", app_log_path)
+    log.info("File logging enabled to %s", APP_LOG_PATH)
 
 def _now(): return datetime.now(timezone.utc)
 
@@ -84,7 +85,17 @@ def home():
     return f"""
     <h1>The project App</h1>
     <img src="data:image/jpeg;base64,{img_b64}" width="400"><br>
-    <small>DevOps with Kubernetes 2025</small>
+    <form method="POST" action="/">
+        <input type="text" id="todo" name="todo" required minlength="4" maxlength="140" size="40" />
+        <button type="submit">Create todo</button>
+    </form>
+        <ul>
+        <li>Assemble carborator</li>
+        <li>Learn Kubernetes</li>
+        <li>Deploy AKS Cluster</li>
+    </ul>
+    <br>
+    <strong>DevOps with Kubernetes 2025</strong>
     """
 
 @app.route("/_shutdown")
