@@ -24,3 +24,5 @@ pip install -r ping-pong_application/requirements.txt
 pip install -r todo_app/requirements.txt
 
 echo "[✓] Development environment ready. Run 'source .venv/bin/activate' to use it."
+
+export DATA_ROOT=./shared

@@ -1,22 +1,30 @@
-# This application generates a random string and echoes it with a UTC timestamp to standard output.
-import random
+# This application reads logs from shared storage and displays them via HTTP endpoint.
+import os
 import logging
 import string
-import os
-from time import sleep
+import random
+from pathlib import Path
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
+from flask import Flask
 
 app = Flask(__name__)
-FLASK_PORT = 3000
-LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
-PING_PONG_LOG_FILE = os.getenv("PING_PONG_LOG_FILE", "ping-pong.log")
 
-logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO
-    )
+# --- Config ---
+DATA_ROOT = Path(os.environ.get("DATA_ROOT", "./shared"))
+LOGS_DIR = DATA_ROOT / "logs"
+LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
+PING_PONG_LOG_FILE = os.environ.get("PING_PONG_LOG_FILE", "ping-pong.log")
+FLASK_PORT = int(os.environ.get("PORT", "3000"))
+
+# --- Paths ---
+LOG_PATH = LOGS_DIR / LOG_FILE
+PING_PONG_PATH = LOGS_DIR / PING_PONG_LOG_FILE
+
+# --- Logging ---
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
+                    format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("log-reader-svc")
 
 def generate_random_string(length=10):
     """Generate a random string of fixed length."""
@@ -28,40 +36,43 @@ def get_current_timestamp():
     now = datetime.now(timezone.utc)
     return now.strftime("%Y-%m-%dT%H:%M:%S") + f".{now.microsecond // 1000:03d}Z"
 
-current_status = {
-    "timestamp": "",
-    "random_string": ""
-}
-
-initial_string = generate_random_string()
-initial_timestamp = get_current_timestamp()
-current_status["timestamp"] = initial_timestamp
-current_status["random_string"] = initial_string
-
-logging.info("Server started in port {0}".format(FLASK_PORT))
-logging.info("Initial random string: {0}".format(initial_string))
-
-
 @app.route('/')
 def get_status():
     """Endpoint to get the current status (timestamp and random string)."""
-    result = f"<h1>HTTP Server ID: {initial_string}</h1><br>"
+    result = f"<h1>HTTP Server ID: {APP_HASH}</h1><br>"
 
+    # Read ping-pong log
     try:
-        with open(f"{PING_PONG_LOG_FILE}", "r") as ping_pong_f:
-            LOG_LINES = ping_pong_f.readline()
-    except FileNotFoundError:
-        return f"{result}Could not find logfile {PING_PONG_LOG_FILE}"
-    result += f"Ping / Pongs: {LOG_LINES}</br></br>"
+        if PING_PONG_PATH.exists():
+            with open(PING_PONG_PATH, "r") as ping_pong_f:
+                ping_pong_lines = ping_pong_f.readline()
+        else:
+            ping_pong_lines = "No ping-pong log found"
+    except Exception as e:
+        log.error("Error reading ping-pong log: %s", e)
+        ping_pong_lines = f"Error reading {PING_PONG_LOG_FILE}"
 
+    result += f"Ping / Pongs: {ping_pong_lines}</br></br>"
+
+    # Read main log
     try:
-        with open(f"{LOG_FILE}", "r") as f:
-            LOG_LINES = f.readlines()
-    except FileNotFoundError:
-        return f"{result}Could not find logfile {LOG_FILE}"
-    for line in LOG_LINES[-10:]:
-        result += f"{line}<br>"
+        if LOG_PATH.exists():
+            with open(LOG_PATH, "r") as f:
+                log_lines = f.readlines()
+            for line in log_lines[-10:]:
+                result += f"{line}<br>"
+        else:
+            result += f"Could not find logfile {LOG_FILE}"
+    except Exception as e:
+        log.error("Error reading main log: %s", e)
+        result += f"Error reading {LOG_FILE}"
+
     return result
 
+# Default port:
 if __name__ == '__main__':
+    APP_HASH = generate_random_string(6)
+
+    log.info("Log reader server started on port %d", FLASK_PORT)
+    log.info("App instance hash: %s", APP_HASH)
     app.run(host='0.0.0.0', port=FLASK_PORT)

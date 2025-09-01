@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 # --- Config ---
-DATA_ROOT   = Path(os.environ.get("DATA_ROOT", "./shared"))  # <-- one root
+DATA_ROOT   = Path(os.environ.get("DATA_ROOT", "./shared"))
 IMAGES_DIR  = DATA_ROOT / "images"
 LOGS_DIR    = DATA_ROOT / "logs"
 
