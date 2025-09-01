@@ -13,31 +13,29 @@ spec:
         app: logoutput
     spec:
       volumes:
-        - name: log-output
+        - name: shared
           persistentVolumeClaim:
             claimName: shared-volume-claim-0
       containers:
         - name: log-reader
-          image: pjmartin/log-reader:1.11.3
+          image: docker.io/pjmartin/log-reader:1.12@sha256:769a55b244cab86f70425b327a816e8de43fe4088a237fe439bfde2c0aad1e6d
           ports:
             - name: http
               containerPort: 3000
           imagePullPolicy: Always
-          env:
-            - name: LOG_FILE
-              value: "/app/logs/log_output.log"
-            - name: PING_PONG_LOG_FILE
-              value: "/app/logs/ping-pong.log"
           volumeMounts:
-            - name: log-output
-              mountPath: /app/logs
+            - name: shared
+              mountPath: /app/data
+          env:
+            - name: DATA_ROOT
+              value: "/app/data"
 
         - name: log-writer
-          image: pjmartin/log-writer:1.10
+          image: docker.io/pjmartin/log-writer:1.12@sha256:69aa6a0250ff7200ed0cfcada2dddec238a0dab190ffe553941444cc46fa3891
           imagePullPolicy: Always
-          env:
-            - name: LOG_FILE
-              value: "/app/logs/log_output.log"
           volumeMounts:
-            - name: log-output
-              mountPath: /app/logs
+            - name: shared
+              mountPath: /app/data
+          env:
+            - name: DATA_ROOT
+              value: "/app/data"

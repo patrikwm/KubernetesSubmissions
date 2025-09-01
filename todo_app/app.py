@@ -1,98 +1,100 @@
-# This application displays todo items with cached images from shared storage.
-import base64
-import logging
-import os
-import random
-import shutil
-import string
-from pathlib import Path
-from datetime import datetime, timezone
-
+# app.py
 from flask import Flask
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+import base64, os, requests, logging
 
 app = Flask(__name__)
 
-# --- Config ---
+# --- config (change only if you want) ---
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "./shared"))
-IMAGES_DIR = DATA_ROOT / "images"
-CACHE_DIR = IMAGES_DIR / "cache"
-IMG_NAME = os.environ.get("IMG_NAME", "image.jpg")
-STAMP_NAME = os.environ.get("STAMP_NAME", ".timestamp")
-MAX_AGE_SEC = int(os.environ.get("MAX_AGE_SEC", "600"))
-FLASK_PORT = int(os.environ.get("PORT", "8080"))
-
-# --- Paths ---
-SHARED_IMG_PATH = IMAGES_DIR / IMG_NAME
-CACHED_IMG_PATH = CACHE_DIR / IMG_NAME
-STAMP_PATH = IMAGES_DIR / STAMP_NAME
+IMG_DIR = DATA_ROOT / "images"
+IMG_PATH = IMG_DIR / "image.jpg"
+TS_PATH  = IMG_DIR / ".ts"
+MAX_AGE_SEC = int(os.environ.get("MAX_AGE_SEC", "600"))  # 10 minutes
+PICSUM_URL = os.environ.get("PICSUM_URL", "https://picsum.photos/1200")
 
 # --- Logging ---
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("todo-svc")
+log = logging.getLogger("todo-app-svc")
 
+def setup_file_logging():
+    """Set up file logging to shared directory."""
+    log_dir = Path("/app/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    app_log_path = log_dir / "todo-app.log"
+    file_handler = logging.FileHandler(app_log_path, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(file_formatter)
+    log.addHandler(file_handler)
+    log.info("File logging enabled to %s", app_log_path)
 
-def generate_random_string(length=10):
-    """Generate a random string of fixed length."""
-    letters = string.ascii_letters + string.digits
-    return ''.join(random.choice(letters) for i in range(length))
+def _now(): return datetime.now(timezone.utc)
 
-def get_image():
-    """Get image from shared storage with caching logic"""
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def _age_seconds() -> float | None:
+    if not TS_PATH.exists(): return None
+    try:
+        ts = datetime.fromisoformat(TS_PATH.read_text().strip())
+        return (_now() - ts).total_seconds()
+    except Exception:
+        return None
 
-    # Check if we have a cached image and if it's still valid
-    if CACHED_IMG_PATH.exists() and STAMP_PATH.exists():
-        try:
-            timestamp = datetime.fromisoformat(STAMP_PATH.read_text().strip())
-            age = datetime.now(timezone.utc) - timestamp
-            if age.total_seconds() < MAX_AGE_SEC:  # Still valid
-                log.debug("Using cached image (age: %.1f seconds)", age.total_seconds())
-                return CACHED_IMG_PATH
-        except (ValueError, FileNotFoundError) as e:
-            log.warning("Invalid timestamp file: %s", e)
+def _ensure_image_exists():
+    IMG_DIR.mkdir(parents=True, exist_ok=True)
+    if not IMG_PATH.exists():
+        log.info("Image doesn't exist, downloading new image")
+        _download_new_image()
 
-    # Cache is stale or missing, try to get from shared storage
-    if SHARED_IMG_PATH.exists():
-        # Copy shared image to cache
-        try:
-            shutil.copy2(SHARED_IMG_PATH, CACHED_IMG_PATH)
-            log.info("Updated cache from shared storage")
-            return CACHED_IMG_PATH
-        except Exception as e:
-            log.error("Failed to copy image to cache: %s", e)
+def _download_new_image():
+    try:
+        log.info("Downloading new image from %s", PICSUM_URL)
+        r = requests.get(PICSUM_URL, timeout=8)
+        r.raise_for_status()
+        IMG_PATH.write_bytes(r.content)
+        TS_PATH.write_text(_now().isoformat())
+        log.info("Successfully downloaded and saved new image")
+    except Exception as e:
+        log.error("Error downloading new image: %s", e)
+        raise
 
-    # No image available
-    log.warning("No image found in shared storage at %s", SHARED_IMG_PATH)
-    return None
-
-@app.route('/todo')
+@app.route("/")
 def home():
-    """Main todo application endpoint with image display"""
-    result = f"<strong>App instance hash:</strong> {APP_HASH}<br>"
-    result += f"<strong>User request hash:</strong> {generate_random_string(6)}<br>"
+    log.info("Home endpoint accessed")
+    _ensure_image_exists()
 
-    image_path = get_image()
-    if image_path and image_path.exists():
+    # read current image to show (always)
+    img_b64 = base64.b64encode(IMG_PATH.read_bytes()).decode("ascii")
+
+    # if stale -> refresh AFTER we've read bytes so user sees current image
+    age = _age_seconds()
+    if age is None or age >= MAX_AGE_SEC:
+        log.info("Image is stale (age: %s seconds), refreshing", age)
         try:
-            # Convert image to base64 for inline display
-            with open(image_path, 'rb') as f:
-                img_data = base64.b64encode(f.read()).decode()
-            result += f'<br><img src="data:image/jpeg;base64,{img_data}" width="400"><br>'
-            result += f"<em>Image from: {image_path}</em><br>"
+            _download_new_image()
         except Exception as e:
-            log.error("Error displaying image: %s", e)
-            result += f"<br>Error loading image: {e}<br>"
+            # ignore any failure; user still got the current image
+            log.warning("Failed to refresh image, serving current one: %s", e)
+            pass
     else:
-        result += "<br>No image available<br>"
+        log.info(f"Image age: {age}, timeout: {MAX_AGE_SEC}")
 
-    return result
+    # super simple page
+    return f"""
+    <h1>The project App</h1>
+    <img src="data:image/jpeg;base64,{img_b64}" width="400"><br>
+    <small>DevOps with Kubernetes 2025</small>
+    """
 
-# Default port:
-if __name__ == '__main__':
-    APP_HASH = generate_random_string(6)
+@app.route("/_shutdown")
+def shutdown():
+    # For testing persistence behavior
+    os._exit(0)
 
-    log.info("Todo server started on port %d", FLASK_PORT)
-    log.info("App instance hash: %s", APP_HASH)
-    app.run(host='0.0.0.0', port=FLASK_PORT)
+if __name__ == "__main__":
+    setup_file_logging()
+    _ensure_image_exists()
+    port = int(os.environ.get("PORT", "3000"))
+    log.info("Todo app server started on port %d", port)
+    app.run(host="0.0.0.0", port=port)

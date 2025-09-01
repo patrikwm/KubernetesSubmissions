@@ -13,18 +13,31 @@ app = Flask(__name__)
 # --- Config ---
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "./shared"))
 LOGS_DIR = DATA_ROOT / "logs"
+
 LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
 PING_PONG_LOG_FILE = os.environ.get("PING_PONG_LOG_FILE", "ping-pong.log")
+APP_LOG_FILE = os.environ.get("APP_LOG_FILE", "log-reader.log")
 FLASK_PORT = int(os.environ.get("PORT", "3000"))
 
 # --- Paths ---
 LOG_PATH = LOGS_DIR / LOG_FILE
 PING_PONG_PATH = LOGS_DIR / PING_PONG_LOG_FILE
+APP_LOG_PATH = LOGS_DIR / APP_LOG_FILE
 
 # --- Logging ---
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("log-reader-svc")
+
+def setup_file_logging():
+    """Set up file logging to shared directory."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(APP_LOG_PATH, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(file_formatter)
+    log.addHandler(file_handler)
+    log.info("File logging enabled to %s", APP_LOG_PATH)
 
 def generate_random_string(length=10):
     """Generate a random string of fixed length."""
@@ -71,6 +84,7 @@ def get_status():
 
 # Default port:
 if __name__ == '__main__':
+    setup_file_logging()
     APP_HASH = generate_random_string(6)
 
     log.info("Log reader server started on port %d", FLASK_PORT)

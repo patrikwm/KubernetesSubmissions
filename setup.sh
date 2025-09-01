@@ -18,7 +18,6 @@ source .venv/bin/activate
 echo "[*] Installing dependencies..."
 pip install --upgrade pip
 
-pip install -r image-downloader/requirements.txt
 pip install -r log_output/requirements.txt
 pip install -r ping-pong_application/requirements.txt
 pip install -r todo_app/requirements.txt
