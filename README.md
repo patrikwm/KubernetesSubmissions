@@ -15,6 +15,7 @@
 - [1.9.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.9/ping-pong_application/)
 - [1.10.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.10/log_output/)
 - [1.11.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.11/log_output/)
+- [1.12.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.12/todo_app/)
 
 
 

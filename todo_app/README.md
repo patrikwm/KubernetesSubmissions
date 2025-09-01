@@ -2,6 +2,21 @@
 
 # 1.12. The project, step 5
 
+## Table of Contents
+
+- [App logic](#app-logic)
+- [Start with clean state](#start-with-clean-state)
+- [Delete old files in shared volume](#delete-old-files-in-shared-volume)
+- [deploy application](#deploy-application)
+- [Verify deployment is up.](#verify-deployment-is-up)
+- [Verify app downloads image and stores in shared volume](#verify-app-downloads-image-and-stores-in-shared-volume)
+- [Check timestamp file.](#check-timestamp-file)
+- [Todo app logs](#todo-app-logs)
+- [First request to app](#first-request-to-app)
+- [10+ min request to app](#10-min-request-to-app)
+- [Force shutdown application](#force-shutdown-application)
+- [Get logs from respawned pod](#get-logs-from-respawned-pod)
+- [Verify image still exists with Image age.](#verify-image-still-exists-with-image-age)
 
 ## App logic
 
