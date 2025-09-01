@@ -21,9 +21,6 @@
 
 ## Notes
 
-### image-downloader
-
-Downloads an image every 10 minutes.
 
 ### log_output
 
@@ -40,6 +37,6 @@ A ping-pong application with one endpoint. Saves output to LOG_FILE environment 
 
 ### todo_app
 
-endpoint: `/todo`
+endpoint: `/`
 
 Todo application with one endpoint. Outputs an app instance hash and a user request hash. Uses DATA_DIR environment variable or ../image-downloader/.data by default to store data.
