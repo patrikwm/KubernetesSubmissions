@@ -13,7 +13,7 @@ spec:
         app: pingpong
     spec:
       volumes:
-        - name: ping-output
+        - name: shared
           persistentVolumeClaim:
             claimName: shared-volume-claim-0
       containers:
@@ -21,10 +21,10 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-          image: pjmartin/pingpong:1.11
+          image: docker.io/pjmartin/pingpong:1.12@sha256:27cccdbb73f65886a231e647594616978bc840f705bbdfafc983ae7e5e0ec76c
           volumeMounts:
-            - name: ping-output
-              mountPath: /app/logs
+            - name: shared
+              mountPath: /app/data
           env:
-            - name: LOG_FILE
-              value: "/app/logs/ping-pong.log"
+            - name: DATA_ROOT
+              value: "/app/data"

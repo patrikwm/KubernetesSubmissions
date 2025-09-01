@@ -6,7 +6,14 @@ spec:
   rules:
   - http:
       paths:
-      - path: /todo
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: todo-app-svc
+            port:
+              number: 2345
+      - path: /_shutdown
         pathType: Prefix
         backend:
           service:

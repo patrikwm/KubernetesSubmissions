@@ -12,13 +12,21 @@ spec:
       labels:
         app: todoapp
     spec:
+      volumes:
+        - name: shared
+          persistentVolumeClaim:
+            claimName: shared-volume-claim-0
       containers:
         - name: todoapp
           ports:
             - name: http
               containerPort: 3000
-          image: pjmartin/todo_app:1.11
-          imagePullPolicy: Always
+          image: docker.io/pjmartin/todo_app:1.12@sha256:d5f6438318a34fdfba4e27549a091953108a95adf58608cb4287484de4678574
+          volumeMounts:
+            - name: shared
+              mountPath: /app/data
           env:
             - name: PORT
               value: "3000"
+            - name: DATA_ROOT
+              value: "/app/data"

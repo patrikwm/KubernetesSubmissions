@@ -15,3 +15,28 @@
 - [1.9.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.9/ping-pong_application/)
 - [1.10.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.10/log_output/)
 - [1.11.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.11/log_output/)
+- [1.12.](https://github.com/patrikwm/KubernetesSubmissions/tree/1.12/todo_app/)
+
+
+
+## Notes
+
+
+### log_output
+
+endpoint: `/`
+
+Outputs a random string with a timestamp every 5 seconds to stdout and to a log file.
+
+### ping-pong_application
+
+endpoint: `/pingpong`
+
+A ping-pong application with one endpoint. Saves output to LOG_FILE environment variable or to ping-pong.log by default.
+
+
+### todo_app
+
+endpoint: `/`
+
+Todo application with one endpoint. Outputs an app instance hash and a user request hash. Uses DATA_DIR environment variable or ../image-downloader/.data by default to store data.
