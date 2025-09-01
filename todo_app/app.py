@@ -78,7 +78,7 @@ def home():
             log.warning("Failed to refresh image, serving current one: %s", e)
             pass
     else:
-        log.info(f"Image age: {age}, timeout: {MAX_AGE_SEC}")
+        log.info("Image age: %s, timeout: %s", age, MAX_AGE_SEC)
 
     # super simple page
     return f"""
