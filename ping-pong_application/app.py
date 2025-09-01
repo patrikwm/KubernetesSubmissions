@@ -6,15 +6,17 @@ from datetime import datetime, timezone
 from flask import Flask
 
 app = Flask(__name__)
-FLASK_PORT = 3000
+
+LOG_FILE          = os.getenv("LOG_FILE", "ping-pong.log")
+FLASK_PORT        = 3000
+PING_PONG_COUNTER = 0
+
 
 logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(message)s",
         level=logging.INFO
     )
 
-PING_PONG_COUNTER = 0
-LOG_FILE = os.getenv("LOG_FILE", "ping-pong.log")
 @app.route('/pingpong')
 def get_status():
     """Endpoint to get the pingpong counter"""
