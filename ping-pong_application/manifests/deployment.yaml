@@ -12,19 +12,12 @@ spec:
       labels:
         app: pingpong
     spec:
-      volumes:
-        - name: shared
-          persistentVolumeClaim:
-            claimName: shared-volume-claim-0
       containers:
         - name: pingpong
           ports:
             - name: http
               containerPort: 3000
-          image: docker.io/pjmartin/pingpong:1.12@sha256:27cccdbb73f65886a231e647594616978bc840f705bbdfafc983ae7e5e0ec76c
-          volumeMounts:
-            - name: shared
-              mountPath: /app/data
+          image: docker.io/pjmartin/pingpong:2.1@sha256:32acb1b02efd443b9ea4fae5ac1124ecac362c327b43af8b44788fee3f675ee0
           env:
             - name: DATA_ROOT
               value: "/app/data"
