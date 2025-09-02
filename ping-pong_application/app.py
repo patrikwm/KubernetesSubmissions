@@ -6,7 +6,7 @@ import string
 from pathlib import Path
 from datetime import datetime, timezone
 
-from flask import Flask
+from flask import Flask, jsonify
 
 app = Flask(__name__)
 
@@ -59,7 +59,7 @@ def generate_random_string(length=10):
 def get_status():
     """Endpoint to get the pingpong counter"""
     global PING_PONG_COUNTER
-    result = f"pong {PING_PONG_COUNTER}"
+    current_counter = PING_PONG_COUNTER
     PING_PONG_COUNTER += 1
 
     # Ensure logs directory exists
@@ -71,9 +71,23 @@ def get_status():
         log.debug("Updated ping-pong counter to %d", PING_PONG_COUNTER)
     except Exception as e:
         log.error("Error writing to log file %s: %s", LOG_PATH, e)
-        return f"Error writing to logfile {LOG_FILE}"
+        return jsonify({"error": f"Error writing to logfile {LOG_FILE}"}), 500
 
-    return result
+    return jsonify({
+        "message": f"pong {current_counter}",
+        "counter": current_counter
+    })
+
+@app.route('/pings')
+def get_pings():
+    """Endpoint to get the pingpong counter"""
+    global PING_PONG_COUNTER
+    current_counter = PING_PONG_COUNTER
+
+    return jsonify({
+        "message": f"pong {current_counter}",
+        "counter": current_counter
+    })
 
 # Default port:
 if __name__ == '__main__':

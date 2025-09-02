@@ -12,20 +12,13 @@ spec:
       labels:
         app: logoutput
     spec:
-      volumes:
-        - name: shared
-          persistentVolumeClaim:
-            claimName: shared-volume-claim-0
       containers:
         - name: log-reader
-          image: docker.io/pjmartin/log-reader:1.12@sha256:769a55b244cab86f70425b327a816e8de43fe4088a237fe439bfde2c0aad1e6d
+          image: docker.io/pjmartin/log-reader:2.1@sha256:345499cd74f32cad14e5e2266f3bc5fa0aea0aefc2165a82c2a107158b0a9219
           ports:
             - name: http
               containerPort: 3000
           imagePullPolicy: Always
-          volumeMounts:
-            - name: shared
-              mountPath: /app/data
           env:
             - name: DATA_ROOT
               value: "/app/data"
@@ -33,9 +26,6 @@ spec:
         - name: log-writer
           image: docker.io/pjmartin/log-writer:1.12@sha256:69aa6a0250ff7200ed0cfcada2dddec238a0dab190ffe553941444cc46fa3891
           imagePullPolicy: Always
-          volumeMounts:
-            - name: shared
-              mountPath: /app/data
           env:
             - name: DATA_ROOT
               value: "/app/data"
