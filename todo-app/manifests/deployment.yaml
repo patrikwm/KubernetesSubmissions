@@ -15,7 +15,7 @@ spec:
       volumes:
         - name: shared
           persistentVolumeClaim:
-            claimName: shared-volume-claim-0
+            claimName: shared-volume-claim-1
       containers:
         - name: todo-app
           image: docker.io/pjmartin/todo-app:2.2@sha256:eb882290c4c6c85786854ec37b7c5f9501f217c423fae6753e5e68d557319139
