@@ -20,6 +20,7 @@
 - [2.1.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.1/log_output/)
 - [2.2.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.2/todo-app/)
 - [2.3.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.3/log_output/)
+- [2.4.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.4/todo-app/)
 
 
 
@@ -28,7 +29,7 @@
 
 ### log_output
 
-endpoint: `/`
+endpoint: `/logs`
 
 Outputs a random string with a timestamp every 5 seconds to stdout and to a log file.
 
