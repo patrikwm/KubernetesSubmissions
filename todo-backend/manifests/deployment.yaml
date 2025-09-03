@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-backend
+  template:
+    metadata:
+      labels:
+        app: todo-backend
+    spec:
+      containers:
+        - name: todo-backend
+          ports:
+            - name: http
+              containerPort: 3000
+          image: docker.io/pjmartin/todo-backend:2.2@sha256:2bf8be40edf9a8cfa02b85f9f6fcb94a60723c91b87f5d3d9fc015e71a991a40
