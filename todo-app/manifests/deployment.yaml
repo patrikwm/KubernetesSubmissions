@@ -6,27 +6,24 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: todoapp
+      app: todo-app
   template:
     metadata:
       labels:
-        app: todoapp
+        app: todo-app
     spec:
       volumes:
         - name: shared
           persistentVolumeClaim:
             claimName: shared-volume-claim-0
       containers:
-        - name: todoapp
-          ports:
-            - name: http
-              containerPort: 3000
-          image: docker.io/pjmartin/todo_app:1.13@sha256:c9b2e2be2155ca0b158d0aaea9ce2bf3959a1fa80bdae3c13325d32fc53852d7
+        - name: todo-app
+          image: docker.io/pjmartin/todo-app:2.2@sha256:eb882290c4c6c85786854ec37b7c5f9501f217c423fae6753e5e68d557319139
           volumeMounts:
             - name: shared
               mountPath: /app/data
           env:
-            - name: PORT
-              value: "3000"
+            - name: TODO_BACKEND_URL
+              value: "http://todo-backend-svc:2345"
             - name: DATA_ROOT
               value: "/app/data"

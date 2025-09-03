@@ -17,43 +17,40 @@ echo "Building and pushing images with tag: $TAG"
 # Array to store image digests
 declare -a DIGESTS=()
 
-# --- todo_app ---
-echo "=> Building todo_app"
-DIGEST=$(docker build ./todo_app \
-  -t $REPO/todo_app:$TAG \
-  --push -q | grep "sha256:" || echo "")
-if [ -n "$DIGEST" ]; then
-  DIGESTS+=("todo_app: docker.io/$REPO/todo_app:$TAG@$DIGEST")
-fi
+# Define applications to build
+# Format: "image_name:build_context:dockerfile_path"
+APPS=(
+  "todo-app:./todo-app:"
+  "pingpong:./ping-pong_application:"
+  "log-reader:./log_output:./log_output/Dockerfile.read"
+  "log-writer:./log_output:./log_output/Dockerfile.write"
+  "todo-backend:./todo-backend:"
+)
 
-# --- ping-pong_application ---
-echo "=> Building pingpong"
-DIGEST=$(docker build ./ping-pong_application \
-  -t $REPO/pingpong:$TAG \
-  --push -q | grep "sha256:" || echo "")
-if [ -n "$DIGEST" ]; then
-  DIGESTS+=("pingpong: docker.io/$REPO/pingpong:$TAG@$DIGEST")
-fi
+# Build and push each application
+for app_config in "${APPS[@]}"; do
+  IFS=':' read -r image_name build_context dockerfile <<< "$app_config"
 
-# --- log_output reader ---
-echo "=> Building log-reader"
-DIGEST=$(docker build ./log_output \
-  -f ./log_output/Dockerfile.read \
-  -t $REPO/log-reader:$TAG \
-  --push -q | grep "sha256:" || echo "")
-if [ -n "$DIGEST" ]; then
-  DIGESTS+=("log-reader: docker.io/$REPO/log-reader:$TAG@$DIGEST")
-fi
+  echo "=> Building $image_name"
 
-# --- log_output writer ---
-echo "=> Building log-writer"
-DIGEST=$(docker build ./log_output \
-  -f ./log_output/Dockerfile.write \
-  -t $REPO/log-writer:$TAG \
-  --push -q | grep "sha256:" || echo "")
-if [ -n "$DIGEST" ]; then
-  DIGESTS+=("log-writer: docker.io/$REPO/log-writer:$TAG@$DIGEST")
-fi
+  # Build docker command
+  build_cmd="docker build $build_context -t $REPO/$image_name:$TAG"
+
+  # Add dockerfile if specified
+  if [ -n "$dockerfile" ]; then
+    build_cmd="$build_cmd -f $dockerfile"
+  fi
+
+  # Add push and quiet flags
+  build_cmd="$build_cmd --push -q"
+
+  # Execute build and capture digest
+  DIGEST=$(eval "$build_cmd" | grep "sha256:" || echo "")
+
+  if [ -n "$DIGEST" ]; then
+    DIGESTS+=("$image_name: docker.io/$REPO/$image_name:$TAG@$DIGEST")
+  fi
+done
 
 
 echo ""

@@ -20,7 +20,8 @@ pip install --upgrade pip
 
 pip install -r log_output/requirements.txt
 pip install -r ping-pong_application/requirements.txt
-pip install -r todo_app/requirements.txt
+pip install -r todo-app/requirements.txt
+pip install -r todo-backend/requirements.txt
 
 echo "[✓] Development environment ready. Run 'source .venv/bin/activate' to use it."
 
