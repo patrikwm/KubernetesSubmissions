@@ -13,6 +13,7 @@ app = Flask(__name__)
 
 # --- Config ---
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "./shared"))
+CONFIG_ROOT = Path(os.environ.get("CONFIG_ROOT", "./config"))
 LOGS_DIR = DATA_ROOT / "logs"
 
 LOG_FILE = os.environ.get("LOG_FILE", "log_output.log")
@@ -22,6 +23,9 @@ PING_PONG_URL = os.getenv(
 )
 APP_LOG_FILE = os.environ.get("APP_LOG_FILE", "log-reader.log")
 FLASK_PORT = int(os.environ.get("PORT", "3000"))
+
+CONFIG_MAP_FILE = os.environ.get("CONFIG_MAP_FILE", "information.txt")
+CONFIG_FILE = CONFIG_ROOT / CONFIG_MAP_FILE
 
 # --- Paths ---
 LOG_PATH = LOGS_DIR / LOG_FILE
@@ -67,7 +71,14 @@ def fetch_ping_pong():
 def get_status():
     """Endpoint to get the current status (timestamp and random string)."""
     result = f"HTTP Server ID: {APP_HASH}\n<br>"
+    try:
+        with open(CONFIG_FILE, mode="r") as f:
+            result += f"file content: {f.readline()}\n<br>"
+    except Exception as e:
+        result += "File: CONFIG_MAP_FILE not found \n<br>"
 
+    CONFIG_MAP_MESSAGE = os.environ.get("MESSAGE", "NO MESSAGE VAR FOUND!")
+    result += f"env variable: {CONFIG_MAP_MESSAGE}\n<br>"
     # Call ping-pong service
     counter = fetch_ping_pong()
     if counter is not None:

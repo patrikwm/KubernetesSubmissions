@@ -16,19 +16,30 @@ spec:
         - name: shared-storage
           persistentVolumeClaim:
             claimName: shared-volume-claim-0
+        - name: config-volume
+          configMap:
+            name: log-output-config
       containers:
         - name: log-reader
-          image: docker.io/pjmartin/log-reader:2.3@sha256:ce70245033939b68ff3a8cbde73c8daa42960033fa27ce874df21955c11e41af
+          image: docker.io/pjmartin/log-reader:2.5@sha256:86ee4ee17cf89270263d11d1cfcb7fb94e500768a21f379a04b793d10c1e0d4d
           ports:
             - name: http
               containerPort: 3000
           volumeMounts:
             - name: shared-storage
               mountPath: /app/data
+            - name: config-volume
+              mountPath: /app/config/
           env:
             - name: DATA_ROOT
               value: "/app/data"
-
+            - name: CONFIG_ROOT
+              value: "/app/config"
+            - name: MESSAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: log-output-config
+                  key: MESSAGE
         - name: log-writer
           image: docker.io/pjmartin/log-writer:2.3@sha256:6bb942841a896eb784f8e8c6c05b8d517ff272e2c03ae58ae372e08d0e01d1db
           volumeMounts:
