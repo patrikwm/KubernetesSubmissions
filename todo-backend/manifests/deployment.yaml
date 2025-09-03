@@ -14,7 +14,4 @@ spec:
     spec:
       containers:
         - name: todo-backend
-          ports:
-            - name: http
-              containerPort: 3000
-          image: docker.io/pjmartin/todo-backend:2.2@sha256:2bf8be40edf9a8cfa02b85f9f6fcb94a60723c91b87f5d3d9fc015e71a991a40
+          image: docker.io/pjmartin/todo-backend:2.2@sha256:149d6db2131423408231c2c98994bc8e6c5029318717400eaf63c4bd3717af70

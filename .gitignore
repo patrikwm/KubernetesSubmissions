@@ -2,5 +2,6 @@
 
 # Simulating the shared directory in Kubernetes
 shared
+data
 
 __pycache__
