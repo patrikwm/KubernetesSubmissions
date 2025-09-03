@@ -1,94 +1,108 @@
 
 # Chapter 3
 
+## 2.5. Documentation and ConfigMaps
 
-## Table of Contents
-
-## 2.3. Keep them separated
-
-Create namespace
+Check ConfigMap content.
 
 ```bash
-➜ k create namespace exercises
-namespace/exercises created
+➜ cat log_output/manifests/configmap.yaml
+───────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+       │ File: log_output/manifests/configmap.yaml
+───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1   │ apiVersion: v1
+   2   │ kind: ConfigMap
+   3   │ metadata:
+   4   │   name: log-output-config
+   5   │ data:
+   6   │   information.txt: |
+   7   │     Hello from information.txt!
+   8   │   MESSAGE: "Hello Message variable!"
+───────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
-- In previous exercise i deleted the log_output app because of path collission. Now i change path to /logs so they can run parallel.
-
-
-Deploy the applications to new namespace. Verify PVC is deployed to correct namespace.
+Apply manifests
 
 ```bash
-➜ kubens default
-Context "k3d-k3s-default" modified.
-Active namespace is "default".
-➜ k get persistentvolumeclaims
-No resources found in default namespace.
-
-➜ kubens exercises
-Context "k3d-k3s-default" modified.
-Active namespace is "exercises".
-
-➜ k get persistentvolumeclaims
-NAME                    STATUS   VOLUME       CAPACITY   ACCESS MODES   STORAGECLASS        VOLUMEATTRIBUTESCLASS   AGE
-shared-volume-claim-0   Bound    agent-0-pv   1Gi        RWO            shared-agent-0-pv   <unset>                 58s
-```
-
-deploy apps to namespace
-
-```bash
-➜ k apply -f log_output/manifests -f ping-pong_application/manifests -n exercises --validate='strict'
+➜ k apply -f log_output/manifests
+configmap/log-output-config created
 deployment.apps/log-output-deployment created
 ingress.networking.k8s.io/log-output-ingress created
 service/log-output-svc created
-deployment.apps/ping-pong-deployment created
-ingress.networking.k8s.io/ping-pong-ingress created
-service/ping-pong-svc created
-
-➜ k get deployments.apps
-NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
-log-output-deployment   1/1     1            1           7s
-ping-pong-deployment    1/1     1            1           7s
-
-➜ k get pods
-NAME                                     READY   STATUS    RESTARTS   AGE
-log-output-deployment-85bf5f5f5b-5zwmg   2/2     Running   0          10s
-ping-pong-deployment-78b976966c-n9jhs    1/1     Running   0          10s
 ```
 
-Test application
+Verify Output is from ConfigMap
 
 ```bash
 ➜ curl localhost:8081/logs
-HTTP Server ID: 68a01156-b53e-4539-8cf9-40a1f15269ef
-<br>Ping / Pongs: 0
-</br></br>2025-09-03 11:42:16,982 - INFO - Server started with hash Wa07GQUfGY
-<br>2025-09-03 11:42:16,982 - INFO - server id: Wa07GQUfGY - hash: Z1mBtREl2p
-<br>2025-09-03 11:43:07,229 - INFO - Server started with hash 7EHahLi0Ni
-<br>2025-09-03 11:43:07,229 - INFO - server id: 7EHahLi0Ni - hash: qbY9Pd2VPp
-<br>2025-09-03 11:43:12,230 - INFO - server id: 7EHahLi0Ni - hash: jGWvVq6kA6
-<br>2025-09-03 11:43:17,234 - INFO - server id: 7EHahLi0Ni - hash: QgSsDYDuIX
+HTTP Server ID: dbd069f7-92ba-49c7-82b9-ae0c2e621538
+<br>file content: Hello from information.txt!
+
+<br>env variable: Hello Message variable!
+<br>Ping / Pongs: 2
+</br></br>2025-09-03 14:37:36,817 - INFO - server id: dJ8nCAQKpw - hash: TKC4mYLhQY
+<br>2025-09-03 14:37:41,819 - INFO - server id: dJ8nCAQKpw - hash: 9ZdJKySro7
+<br>2025-09-03 14:37:46,821 - INFO - server id: dJ8nCAQKpw - hash: wXz39tm6ud
+<br>2025-09-03 14:37:51,823 - INFO - server id: dJ8nCAQKpw - hash: vuKhrVbx6w
+<br>2025-09-03 14:37:56,829 - INFO - server id: dJ8nCAQKpw - hash: p8weUznpfU
+<br>2025-09-03 14:38:01,834 - INFO - server id: dJ8nCAQKpw - hash: wlvkHqliL5
+<br>2025-09-03 14:38:06,835 - INFO - server id: dJ8nCAQKpw - hash: nQirIAna2L
+<br>2025-09-03 14:38:40,243 - INFO - Server started with hash B4qToFKsc2
+<br>2025-09-03 14:38:40,243 - INFO - server id: B4qToFKsc2 - hash: ifsXH9h6w4
+<br>2025-09-03 14:38:45,246 - INFO - server id: B4qToFKsc2 - hash: 86knWDQo3p
 <br>%
+```
 
-➜ curl localhost:8081/pingpong
-{"counter":0,"message":"pong 0"}
+Update ConfigMap file content. (Variable changes require redeploy of pod so its not changed on the fly.)
 
-➜ curl localhost:8081/pingpong
-{"counter":1,"message":"pong 1"}
+```bash
+➜ cat log_output/manifests/configmap.yaml
+───────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+       │ File: log_output/manifests/configmap.yaml
+───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1   │ apiVersion: v1
+   2   │ kind: ConfigMap
+   3   │ metadata:
+   4   │   name: log-output-config
+   5   │ data:
+   6   │   information.txt: |
+   7   │     NEW MESSAGE IN FILE!
+   8   │   MESSAGE: "Hello Message variable!"
+───────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
+
+Apply updated config map
+
+```bash
+➜ k apply -f log_output/manifests
+configmap/log-output-config configured
+deployment.apps/log-output-deployment unchanged
+ingress.networking.k8s.io/log-output-ingress unchanged
+service/log-output-svc unchanged
+```
+
+Verify file is read on each request
+
+```bash
 
 ➜ curl localhost:8081/logs
-HTTP Server ID: 68a01156-b53e-4539-8cf9-40a1f15269ef
-<br>Ping / Pongs: 2
-</br></br>2025-09-03 11:47:22,358 - INFO - server id: 7EHahLi0Ni - hash: ejzZAsh7z2
-<br>2025-09-03 11:47:27,362 - INFO - server id: 7EHahLi0Ni - hash: 2Kr3TCjCo6
-<br>2025-09-03 11:47:32,363 - INFO - server id: 7EHahLi0Ni - hash: kqCEjpiggX
-<br>2025-09-03 11:47:37,364 - INFO - server id: 7EHahLi0Ni - hash: h8cCWcIznQ
-<br>2025-09-03 11:47:42,366 - INFO - server id: 7EHahLi0Ni - hash: LlcmI1oT1z
-<br>2025-09-03 11:47:47,368 - INFO - server id: 7EHahLi0Ni - hash: 0hF7C3Usw6
-<br>2025-09-03 11:47:52,369 - INFO - server id: 7EHahLi0Ni - hash: fpOtdqKtpf
-<br>2025-09-03 11:47:57,370 - INFO - server id: 7EHahLi0Ni - hash: olTmjiqlvn
-<br>2025-09-03 11:48:02,373 - INFO - server id: 7EHahLi0Ni - hash: 8HukY1tq1b
-<br>2025-09-03 11:48:07,374 - INFO - server id: 7EHahLi0Ni - hash: 7MbVuMsQg5
-<br>%
+HTTP Server ID: dbd069f7-92ba-49c7-82b9-ae0c2e621538
+<br>file content: NEW MESSAGE IN FILE!
 
+<br>env variable: Hello Message variable!
+<br>Ping / Pongs: 2
+</br></br>2025-09-03 14:39:15,269 - INFO - server id: B4qToFKsc2 - hash: 39W2MVPGpg
+<br>2025-09-03 14:39:20,277 - INFO - server id: B4qToFKsc2 - hash: h93ITed4QN
+<br>2025-09-03 14:39:25,284 - INFO - server id: B4qToFKsc2 - hash: 6BFD2JrON0
+<br>2025-09-03 14:39:30,288 - INFO - server id: B4qToFKsc2 - hash: xkU7oC445n
+<br>2025-09-03 14:39:35,289 - INFO - server id: B4qToFKsc2 - hash: Z0N3fRAX0t
+<br>2025-09-03 14:39:40,291 - INFO - server id: B4qToFKsc2 - hash: UUnE0ZDSQ9
+<br>2025-09-03 14:39:45,294 - INFO - server id: B4qToFKsc2 - hash: W9T4MAs3Zn
+<br>2025-09-03 14:39:50,299 - INFO - server id: B4qToFKsc2 - hash: 21ZD0rYao7
+<br>2025-09-03 14:39:55,308 - INFO - server id: B4qToFKsc2 - hash: Vscac29vrT
+<br>2025-09-03 14:40:00,312 - INFO - server id: B4qToFKsc2 - hash: uATb5lMd8Z
+<br>%
+➜ KubernetesSubmissions ⚡( 34-exercise-25-documentation-and-configmaps)                                                       3.10.13 3 hours ago
+▶
 ```
