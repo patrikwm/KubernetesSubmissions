@@ -63,6 +63,7 @@ def fetch_ping_pong():
         return None
 
 @app.route('/')
+@app.route('/logs')
 def get_status():
     """Endpoint to get the current status (timestamp and random string)."""
     result = f"HTTP Server ID: {APP_HASH}\n<br>"
