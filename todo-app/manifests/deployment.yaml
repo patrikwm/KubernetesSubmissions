@@ -18,12 +18,10 @@ spec:
             claimName: shared-volume-claim-1
       containers:
         - name: todo-app
-          image: docker.io/pjmartin/todo-app:2.2@sha256:eb882290c4c6c85786854ec37b7c5f9501f217c423fae6753e5e68d557319139
+          image: docker.io/pjmartin/todo-app:2.6@sha256:e6fbb112de06a326201f979127fe54877985e0eed3af3c45123aa68f3d94d8d8
           volumeMounts:
             - name: shared
               mountPath: /app/data
-          env:
-            - name: TODO_BACKEND_URL
-              value: "http://todo-backend-svc:2345"
-            - name: DATA_ROOT
-              value: "/app/data"
+          envFrom:
+            - configMapRef:
+                name: todo-app-config

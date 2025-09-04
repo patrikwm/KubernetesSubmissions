@@ -1,4 +1,5 @@
 # app/main.py
+import os
 from datetime import datetime
 from typing import List
 from uuid import uuid4, UUID
@@ -34,10 +35,11 @@ store = TodoStore()
 # ----- App -----
 app = FastAPI(title="todo-backend", version="0.1.0")
 
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*".split(","))
 # CORS for SPA (adjust allowed origins as needed)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # tighten later (e.g., ["https://todo.example.com"])
+    allow_origins=[CORS_ORIGINS],           # tighten later (e.g., ["https://todo.example.com"])
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
