@@ -215,3 +215,93 @@ Session Affinity:         None
 Internal Traffic Policy:  Cluster
 Events:                   <none>
 ```
+
+---
+
+# PostgreSQL Integration
+
+## Overview
+
+The ping-pong application has been converted from Flask to FastAPI and now includes PostgreSQL database integration. The counter is persisted in a PostgreSQL database instead of local files.
+
+## Features
+
+- **FastAPI Framework**: Migrated from Flask to FastAPI for better async support
+- **PostgreSQL Integration**: Counter values are stored in PostgreSQL database
+- **Async Operations**: All database operations are asynchronous
+- **Health Check**: `/health` endpoint to verify database connectivity
+- **Backward Compatibility**: File logging is maintained as backup
+
+## Endpoints
+
+- `GET /pingpong` - Increment and return the ping-pong counter
+- `GET /pings` - Get current counter value without incrementing
+- `GET /health` - Database connectivity health check
+
+## Database Schema
+
+```sql
+CREATE TABLE ping_pong (
+    id SERIAL PRIMARY KEY,
+    counter INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## Environment Variables
+
+The application supports the following environment variables:
+
+```bash
+# PostgreSQL Configuration
+POSTGRES_HOST=postgres-svc
+POSTGRES_PORT=5432
+POSTGRES_DB=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=example
+
+# Application Configuration
+PORT=3000
+DATA_ROOT=/app/data
+LOG_LEVEL=INFO
+```
+
+## Deployment Steps
+
+1. **Deploy PostgreSQL StatefulSet**:
+   ```bash
+   kubectl apply -f ../postgres/manifests/postgres.yaml
+   ```
+
+2. **Build and Push Docker Image**:
+   ```bash
+   docker build . --tag your-registry/pingpong:latest --push
+   ```
+
+3. **Update deployment.yaml** with PostgreSQL environment variables (already done)
+
+4. **Deploy the Application**:
+   ```bash
+   kubectl apply -f manifests/
+   ```
+
+## Testing
+
+1. **Test Database Connectivity**:
+   ```bash
+   python test_db.py
+   ```
+
+2. **Test Application Endpoints**:
+   ```bash
+   curl localhost:8081/health
+   curl localhost:8081/pingpong
+   curl localhost:8081/pings
+   ```
+
+## Dependencies
+
+- `fastapi==0.104.1` - Web framework
+- `uvicorn==0.24.0` - ASGI server
+- `asyncpg==0.29.0` - PostgreSQL async driver
+- `databases==0.8.0` - Database abstraction layer
