@@ -14,7 +14,9 @@ spec:
     spec:
       containers:
         - name: todo-backend
-          image: docker.io/pjmartin/todo-backend:2.6@sha256:c5b5cea21afe5e2a36900b65218a9eb8d5b008a9c83e251e4ec8282bcf215cc1
+          image: docker.io/pjmartin/todo-backend:2.8@sha256:20c75537a4c9f0fd2118e6b772856af6e7282fc45b5741167efad0cb367888cf
           envFrom:
             - configMapRef:
                 name: todo-backend-config
+            - secretRef:
+                name: todo-backend-secrets
