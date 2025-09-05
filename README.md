@@ -31,6 +31,10 @@
 - [2.9.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.9/todo-backend/)
 - [2.10.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.10/todo-app/)
 
+### Chapter 4
+
+- [AKS cluster setup](https://github.com/patrikwm/KubernetesSubmissions/tree/3.0/aks-cluster/)
+
 
 ## Notes
 
