@@ -29,6 +29,7 @@
 - [2.7.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.7/postgres/)
 - [2.8.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.8/todo-backend/)
 - [2.9.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.9/todo-backend/)
+- [2.10.](https://github.com/patrikwm/KubernetesSubmissions/tree/2.10/todo-app/)
 
 
 ## Notes

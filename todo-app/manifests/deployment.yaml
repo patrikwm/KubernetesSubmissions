@@ -18,7 +18,7 @@ spec:
             claimName: shared-volume-claim-1
       containers:
         - name: todo-app
-          image: docker.io/pjmartin/todo-app:2.6@sha256:e6fbb112de06a326201f979127fe54877985e0eed3af3c45123aa68f3d94d8d8
+          image: docker.io/pjmartin/todo-app:2.10@sha256:66e88a2ea0494f6e804b13959bcdd9bd1640759732397b09894274528f3197d2
           volumeMounts:
             - name: shared
               mountPath: /app/data
