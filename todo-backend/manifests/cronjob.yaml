@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wiki-todo-cron
+  # namespace: exercises   # ← uncomment/set if your backend runs in a specific ns
+spec:
+  # Runs at the top of every hour (use "@hourly" if you prefer)
+  schedule: "0 * * * *"
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: add-wiki-todo
+              image: curlimages/curl:8.7.1
+              env:
+                # Make backend/port easy to change without editing the script
+                - name: TODO_API
+                  value: "http://todo-backend-svc:2345"
+              args:
+                - /bin/sh
+                - -ceu
+                - |
+                  set -euo pipefail
+
+                  # 1) Get a random Wikipedia article URL (follow redirects, print final URL)
+                  RANDOM_URL="$(curl -s -L -o /dev/null -w '%{url_effective}' 'https://en.wikipedia.org/wiki/Special:Random')"
+                  echo "Random article: ${RANDOM_URL}"
+
+                  # 2) Build JSON payload: {"text":"Read <URL>"}
+                  payload=$(printf '{"text":"Read %s"}' "$RANDOM_URL")
+
+                  # 3) POST to the todo backend
+                  curl -fsS -X POST \
+                    -H 'Content-Type: application/json' \
+                    -d "$payload" \
+                    "${TODO_API}/todos"
+
+                  echo "Todo created successfully."
