@@ -1,0 +1,4 @@
+loki:
+  config:
+    limits_config:
+      volume_enabled: true

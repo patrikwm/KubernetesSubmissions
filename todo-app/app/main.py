@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 import httpx
-from fastapi import FastAPI, BackgroundTasks, Form, status, Request
+from fastapi import FastAPI, BackgroundTasks, Form, status, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 
 # ---------- Config ----------
@@ -170,9 +170,24 @@ async def home(background: BackgroundTasks) -> str:
     <strong>DevOps with Kubernetes 2025</strong>
     """
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Middleware to log incoming requests."""
+    log.info("Request: %s %s", request.method, request.url)
+    response = await call_next(request)
+    log.info("Response status: %s", response.status_code)
+    return response
+
 @app.post("/", response_class=HTMLResponse)
 async def create(todo: str = Form(...)) -> RedirectResponse:
+    if len(todo) > 140:
+        log.warning("Rejected todo: '%s' (too long)", todo)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Todo text exceeds 140 characters",
+        )
     await _create_todo(todo)
+    log.info("Accepted todo: '%s'", todo)
     # PRG pattern
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
