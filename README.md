@@ -36,6 +36,14 @@
 - [AKS cluster setup](https://github.com/patrikwm/KubernetesSubmissions/tree/3.0/aks-cluster/)
 
 
+## Scripts
+
+- Setup AKS Cluster: `./script/setup-aks-cluster.sh`
+- Delete AKS Cluster: `./script/delete-aks-cluster.sh`
+- Update deployments: `./script/update-deployments.sh <deployment-name> <image-version>`
+- Deploy Postgres: `./script/deploy-postgres.sh`
+
+
 ## Notes
 
 
