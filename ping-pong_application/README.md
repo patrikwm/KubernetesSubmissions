@@ -2,6 +2,8 @@
 
 # Exercise: 3.1. Pingpong AKS
 
+## Deploy postgres
+
 Set up the postgres database with old config.
 
 ```bash
@@ -43,16 +45,19 @@ managed-csi-premium     disk.csi.azure.com   Delete          WaitForFirstConsume
 managed-premium         disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
 ```
 
-Delete StatefulSet of Prometheus, Update the storage class to managed-csi, and redeploy.
+Delete StatefulSet of postgres, Update the storage class to managed-csi, and redeploy.
 
 ```bash
 ➜ k delete statefulsets.apps postgres-stset
 statefulset.apps "postgres-stset" deleted
+
 ➜ k get statefulsets.apps
+
 ➜ ./script/deploy-postgres.sh.sh
 secret/postgres-secrets unchanged
 service/postgres-svc unchanged
 statefulset.apps/postgres-stset created
+
 ➜ k get events
 LAST SEEN   TYPE      REASON                  OBJECT                                                         MESSAGE
 6m31s       Warning   ProvisioningFailed      persistentvolumeclaim/postgres-data-storage-postgres-stset-0   storageclass.storage.k8s.io "local-path" not found
@@ -69,6 +74,7 @@ LAST SEEN   TYPE      REASON                  OBJECT                            
 6m16s       Normal    SuccessfulDelete        statefulset/postgres-stset                                     delete Pod postgres-stset-0 in StatefulSet postgres-stset successful
 16s         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Claim postgres-data-storage-postgres-stset-0 Pod postgres-stset-0 in StatefulSet postgres-stset success
 16s         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
+
 ➜ k get statefulsets.apps
 NAME             READY   AGE
 postgres-stset   0/1     19m
@@ -147,7 +153,7 @@ Events:
   Normal  Pulling                 26m   kubelet                  Pulling image "postgres:17.6"
 ```
 
-Seems the image is not being pulled. I will try to change the image to be fully qualified and redeploy.
+Pod is stuck at pulling the image. I will try to change the image to be fully qualified and redeploy.
 
 ```bash
 ➜ k delete statefulsets.apps postgres-stset
@@ -216,5 +222,163 @@ PostgreSQL init process complete; ready for start up.
 2025-09-05 14:11:28.783 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
 2025-09-05 14:11:28.795 UTC [62] LOG:  database system was shut down at 2025-09-05 14:11:28 UTC
 2025-09-05 14:11:28.805 UTC [1] LOG:  database system is ready to accept connections
+```
+Success!
+
+## Deploy ping pong application
+
+```bash
+Since im taking up and down the cluster i created some deployment scripts in `./script` to make my life easier.
+
+Deploy ping pong application.
+
+```bash
+➜ chmod +x ./script/deploy-ping-pong.sh
+➜ ./script/deploy-ping-pong.sh
+namespace/exercises created
+secret/ping-pong-secrets created
+configmap/log-output-config created
+deployment.apps/ping-pong-deployment created
+service/ping-pong-svc created
+ingress.networking.k8s.io/ping-pong-ingress created
+➜ k get pods
+NAME                                    READY   STATUS         RESTARTS   AGE
+ping-pong-deployment-6b5ff4bbbd-kwbmb   0/1     ErrImagePull   0          38s
+➜ k logs -f ping-pong-deployment-6b5ff4bbbd-kwbmb
+Error from server (BadRequest): container "pingpong" in pod "ping-pong-deployment-6b5ff4bbbd-kwbmb" is waiting to start: trying and failing to pull image
+```
+
+Add a docker registry secret to the deployment manifest.
+
+```bash
+k create secret docker-registry regcred \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=pjmartin \
+  --docker-password=MyPAT \
+  --docker-email=<my@email.com> \
+  -n exercises
+secret/regcred created
+
+➜ k get secrets regcred -o yaml
+apiVersion: v1
+data:
+  .dockerconfigjson: <MyBase64EncodedDockerConfig>
+kind: Secret
+metadata:
+  creationTimestamp: "2025-09-08T08:15:44Z"
+  name: regcred
+  namespace: exercises
+  resourceVersion: "30561"
+  uid: 1fd8020e-532a-41b4-9ff2-2b0458641a8e
+type: kubernetes.io/dockerconfigjson
+
+➜ echo "<MyBase64EncodedDockerConfig>" | base64 --decode
+{"auths":{"https://index.docker.io/v1/":{"username":"pjmartin","password":"MyPAT","email":"<my@email.com>","auth":"<myBase64EncodedAuth>"}}}
+```
+
+Seems i have missed to build x86_64 image. Build and push it to docker hub.
+
+```bash
+  Normal   Pulling    10s (x2 over 27s)  kubelet            Pulling image "docker.io/pjmartin/pingpong:3.1@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1"
+  Warning  Failed     8s (x2 over 25s)   kubelet            Failed to pull image "docker.io/pjmartin/pingpong:3.1@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1": rpc error: code = NotFound desc = failed to pull and unpack image "docker.io/pjmartin/pingpong@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1": no match for platform in manifest: not found
+  Warning  Failed     8s (x2 over 25s)   kubelet            Error: ErrImagePull
+```
+
+My docker images were built for my local Arm64 M1 mac. I need to build for linux/amd64. So i updated the `./script/build-and-push.sh` script to use buildx and build for multiple platforms.
+
+```bash
+./script/build-and-push.sh 3.1
+....
+=== Log Output ===
+arm64: docker.io/pjmartin/todo-app:3.1@sha256:ee93cba07a0c1cf1558b090eb0f97f8a6e2ba370dc857cec2d53950c179282e8
+arm64: docker.io/pjmartin/pingpong:3.1@sha256:633f80a0b884708c0ef64e9ddebef032e47b3a781eac5c5cfb6cfba53d87f3ec
+arm64: docker.io/pjmartin/log-reader:3.1@sha256:342c2cd3d47cf81a5b2c7b4f59ea79207785669e895ecfe64b51dcd1dffca078
+arm64: docker.io/pjmartin/log-writer:3.1@sha256:eab3fe1c8829d21b7124139dacd2cbe163cb3eb7672d2d3617cbabae2db0ac5e
+arm64: docker.io/pjmartin/todo-backend:3.1@sha256:dee0334cc0de64ccabd2a135df794225299052db9c827218e0790bda1b8044da
+x86_64: docker.io/pjmartin/todo-app:3.1@sha256:c3001c69fbe7b57dd814ced1fd3c5dfb48df33309926f9de16c822c40f87b886
+x86_64: docker.io/pjmartin/pingpong:3.1@sha256:ad21bf3ec6916a88f0bb7f03cf6fd27e85d347437c7c56ecb98f91ffa015f2c9
+x86_64: docker.io/pjmartin/log-reader:3.1@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb
+x86_64: docker.io/pjmartin/log-writer:3.1@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243
+x86_64: docker.io/pjmartin/todo-backend:3.1@sha256:cd7c89eb4a6e210f4af4f30f242651b4180fab16bcc57682f71c9e65c1682f75
+
+Multi-architecture build complete!
+Images built for: linux/amd64, linux/arm64
+These images will work on both ARM64 (local) and x86_64 (AKS) systems.
+```
+
+```bash
+➜ ./script/postgres.sh apply
+Applying postgres resources to namespace database...
+Error from server (AlreadyExists): namespaces "database" already exists
+secret/postgres-secrets created
+service/postgres-svc created
+statefulset.apps/postgres-stset created
+
+➜ ./script/ping-pong.sh apply
+Applying resources to namespace exercises...
+Error from server (AlreadyExists): namespaces "exercises" already exists
+secret/ping-pong-secrets created
+configmap/log-output-config created
+deployment.apps/ping-pong-deployment created
+service/ping-pong-svc created
+ingress.networking.k8s.io/ping-pong-ingress created
+
+➜ k get pods -n exercises
+NAME                                    READY   STATUS    RESTARTS   AGE
+ping-pong-deployment-688648f568-h2vp2   1/1     Running   0          25s
+
+➜ k logs -n exercises -f ping-pong-deployment-688648f568-h2vp2
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+2025-09-08 09:33:21,065 INFO File logging enabled to /app/data/logs/ping-pong-app.log
+2025-09-08 09:33:21,065 INFO Attempting to connect to database: postgresql://postgres:***@postgres-svc.database:5432/postgres
+2025-09-08 09:33:21,452 INFO Connected to database postgresql://postgres:********@postgres-svc.database:5432/postgres
+2025-09-08 09:33:21,452 INFO Connected to PostgreSQL database
+2025-09-08 09:33:21,457 INFO Database connectivity test successful: 1
+2025-09-08 09:33:21,466 INFO Ping-pong table created or already exists
+2025-09-08 09:33:21,469 INFO Current records in ping_pong table: 0
+2025-09-08 09:33:21,475 INFO Initialized ping-pong counter in database with value 0
+2025-09-08 09:33:21,475 INFO Database initialization successful - using PostgreSQL
+2025-09-08 09:33:21,475 INFO Ping-pong server started on port 3000
+2025-09-08 09:33:21,475 INFO App instance hash: cJi6hm
+2025-09-08 09:33:21,475 INFO Storage mode: PostgreSQL
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+^C%
+
+➜ k get ingress
+NAME                CLASS    HOSTS   ADDRESS   PORTS   AGE
+ping-pong-ingress   <none>   *                 80      41s
+
+➜ k get svc
+NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
+ping-pong-svc   ClusterIP   10.0.166.78   <none>        2345/TCP   2m19s
+```
+
+Now everything is up and running but i forgot to change the SVC type to LoadBalancer. I will redeploy the pingpong app with LoadBalancer type.
+
+```bash
+➜ ./script/ping-pong.sh apply
+Applying resources to namespace exercises...
+Error from server (AlreadyExists): namespaces "exercises" already exists
+secret/ping-pong-secrets unchanged
+configmap/log-output-config unchanged
+deployment.apps/ping-pong-deployment unchanged
+service/ping-pong-svc configured
+ingress.networking.k8s.io/ping-pong-ingress unchanged
+
+➜ k get svc --watch
+NAME            TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+ping-pong-svc   LoadBalancer   10.0.166.78   <pending>     80:32340/TCP   4m4s
+ping-pong-svc   LoadBalancer   10.0.166.78   135.225.2.178   80:32340/TCP   4m5s
+```
+
+Now i can access the ping pong application using the external IP.
+
+```bash
+➜ curl http://135.225.2.178/pingpong
+{"message":"pong 0","counter":0,"storage":"database"}%
+➜ curl http://135.225.2.178/pingpong
+{"message":"pong 1","counter":1,"storage":"database"}%
 ```
 
