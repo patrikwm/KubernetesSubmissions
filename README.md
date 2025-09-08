@@ -35,6 +35,7 @@
 
 - [AKS cluster setup](https://github.com/patrikwm/KubernetesSubmissions/tree/3.0/aks-cluster/)
 - [3.1.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.1/ping-pong_application/)
+- [3.2.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.2/ping-pong_application/)
 
 
 ## Scripts

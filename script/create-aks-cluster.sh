@@ -13,6 +13,9 @@ az aks create \
         --tier free \
         --ssh-key-value ~/.ssh/id_rsa.pub
 
+echo "Install Nginx Routing"
+az aks approuting enable --resource-group rg-aks-mooc-001 --name dwk-cluster
+
 echo "Cluster done! Now logging in to it"
 
 az aks get-credentials --resource-group rg-aks-mooc-001 --name dwk-cluster
