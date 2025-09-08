@@ -27,7 +27,8 @@ spec:
     spec:
       containers:
         - name: pingpong
-          image: docker.io/pjmartin/pingpong:2.7@sha256:c8df613bd2b14dad8baf103a20823af0fe084d724b86a7f46ab0ed0a5f0dae4d
+          image: docker.io/pjmartin/pingpong:3.1@sha256:ad21bf3ec6916a88f0bb7f03cf6fd27e85d347437c7c56ecb98f91ffa015f2c9
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: log-output-config
