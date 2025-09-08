@@ -1,141 +1,193 @@
 # Chapter 4
 
-# Exercise: 3.1. Pingpong AKS
+# Exercise: 3.2. Back to Ingress AKS
 
-## Deploy postgres
+- GKE runs with a built-in ingress controller (Google L7) out of the box.
+- AKS does not ship with a default ingress-controller.
 
-Set up the postgres database with old config.
+## Fastest fix (managed NGINX on AKS)
+
+**Enable the Application Routing add-on (managed NGINX):**
+`az aks update -g <RESOURCE_GROUP> -n <CLUSTER_NAME> --enable-app-routing`
+
+then add this to the Ingress Spec:
+`ingressClassName: webapprouting.kubernetes.azure.com`
+
+[Managed NGINX ingress with the application routing add-on](https://learn.microsoft.com/en-us/azure/aks/app-routing?utm_source=chatgpt.com)
+
+
+## Enable Approuting for AKS.
+
+Create Nginx Ingress controller with Application Routing add-on:
 
 ```bash
-./script/deploy-postgres.sh.sh
-secret/postgres-secrets created
-service/postgres-svc created
-statefulset.apps/postgres-stset created
+➜ az aks approuting enable --resource-group rg-aks-mooc-001 --name dwk-cluster
 ```
 
-local-path does not seem to work in AKS.
+![nginx-ingress](../images/nginx-ingress.png)
+
+## Redeploy the application with the updated ingress spec.
 
 ```bash
-➜ k get statefulsets.apps
-NAME             READY   AGE
-postgres-stset   0/1     58s
-➜ k get events
-LAST SEEN   TYPE      REASON               OBJECT                                                         MESSAGE
-11s         Warning   ProvisioningFailed   persistentvolumeclaim/postgres-data-storage-postgres-stset-0   storageclass.storage.k8s.io "local-path" not found
-4m38s       Warning   FailedScheduling     pod/postgres-stset-0                                           0/5 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/5 nodes are available: 5 Preemption is not helpful for scheduling.
-62s         Warning   FailedScheduling     pod/postgres-stset-0                                           0/5 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/5 nodes are available: 5 Preemption is not helpful for scheduling.
-4m38s       Normal    SuccessfulCreate     statefulset/postgres-stset                                     create Claim postgres-data-storage-postgres-stset-0 Pod postgres-stset-0 in StatefulSet postgres-stset success
-4m38s       Normal    SuccessfulCreate     statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
-62s         Normal    SuccessfulCreate     statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
+➜ ./script/ping-pong.sh delete
+Deleting resources from namespace exercises...
+secret "ping-pong-secrets" deleted
+configmap "log-output-config" deleted
+deployment.apps "ping-pong-deployment" deleted
+service "ping-pong-svc" deleted
+ingress.networking.k8s.io "ping-pong-ingress" deleted
+
+➜ ./script/ping-pong.sh apply
+Applying resources to namespace exercises...
+Error from server (AlreadyExists): namespaces "exercises" already exists
+secret/ping-pong-secrets created
+configmap/log-output-config created
+deployment.apps/ping-pong-deployment created
+service/ping-pong-svc created
+ingress.networking.k8s.io/ping-pong-ingress created
+
+➜ k get svc
+NAME            TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+ping-pong-svc   NodePort   10.0.107.16   <none>        80:32522/TCP   4s
+
+➜ k get ing
+NAME                CLASS    HOSTS   ADDRESS   PORTS   AGE
+ping-pong-ingress   <none>   *                 80      8s
+````
+
+forgot to add ingressClassName to the ingress spec, so update it now:
+
+```bash
+
+
+➜ k apply -f ping-pong_application/manifests/ingress.yaml
+ingress.networking.k8s.io/ping-pong-ingress configured
+
+➜ k get ing --watch
+NAME                CLASS                                HOSTS   ADDRESS   PORTS   AGE
+ping-pong-ingress   webapprouting.kubernetes.azure.com   *                 80      36s
+ping-pong-ingress   webapprouting.kubernetes.azure.com   *       9.223.19.249   80      54s
+^C%
+
+➜ curl http://9.223.19.249/pingpong
+<html>
+<head><title>503 Service Temporarily Unavailable</title></head>
+<body>
+<center><h1>503 Service Temporarily Unavailable</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
 ```
 
-Get storageclass and see that local-path is not there.
+Something is still not right, check the logs of the ingress controller:
 
 ```bash
-➜ k get storageclass
-NAME                    PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-azurefile               file.csi.azure.com   Delete          Immediate              true                   39m
-azurefile-csi           file.csi.azure.com   Delete          Immediate              true                   39m
-azurefile-csi-premium   file.csi.azure.com   Delete          Immediate              true                   39m
-azurefile-premium       file.csi.azure.com   Delete          Immediate              true                   39m
-default (default)       disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
-managed                 disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
-managed-csi             disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
-managed-csi-premium     disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
-managed-premium         disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   39m
+➜ cat ping-pong_application/manifests/ingress.yaml| grep number
+              number: 2345
+              number: 2345
+➜ cat ping-pong_application/manifests/service.yaml
+───────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+       │ File: ping-pong_application/manifests/service.yaml
+───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1   │ apiVersion: v1
+   2   │ kind: Service
+   3   │ metadata:
+   4   │   name: ping-pong-svc
+   5   │ spec:
+   6 ~ │   type: NodePort
+   7   │   selector:
+   8   │     app: pingpong
+   9   │   ports:
+  10   │     - name: http
+  11   │       protocol: TCP
+  12   │       port: 80
+  13   │       targetPort: 3000
+───────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
-Delete StatefulSet of postgres, Update the storage class to managed-csi, and redeploy.
+Seems to be an issue with the port mapping, the service exposes port 80 but the ingress is trying to reach port 2345 on the service.
 
 ```bash
-➜ k delete statefulsets.apps postgres-stset
-statefulset.apps "postgres-stset" deleted
-
-➜ k get statefulsets.apps
-
-➜ ./script/deploy-postgres.sh.sh
-secret/postgres-secrets unchanged
-service/postgres-svc unchanged
-statefulset.apps/postgres-stset created
-
-➜ k get events
-LAST SEEN   TYPE      REASON                  OBJECT                                                         MESSAGE
-6m31s       Warning   ProvisioningFailed      persistentvolumeclaim/postgres-data-storage-postgres-stset-0   storageclass.storage.k8s.io "local-path" not found
-16s         Normal    WaitForFirstConsumer    persistentvolumeclaim/postgres-data-storage-postgres-stset-0   waiting for first consumer to be created before binding
-16s         Normal    ExternalProvisioning    persistentvolumeclaim/postgres-data-storage-postgres-stset-0   Waiting for a volume to be created either by the external provisioner 'disk.csi.azure.com' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
-16s         Normal    Provisioning            persistentvolumeclaim/postgres-data-storage-postgres-stset-0   External provisioner is provisioning volume for claim "database/postgres-data-storage-postgres-stset-0"
-14s         Normal    ProvisioningSucceeded   persistentvolumeclaim/postgres-data-storage-postgres-stset-0   Successfully provisioned volume pvc-0ccd6737-66b6-4326-9548-3f70cf05d7a3
-21m         Warning   FailedScheduling        pod/postgres-stset-0                                           0/5 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/5 nodes are available: 5 Preemption is not helpful for scheduling.
-7m54s       Warning   FailedScheduling        pod/postgres-stset-0                                           0/5 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/5 nodes are available: 5 Preemption is not helpful for scheduling.
-14s         Normal    Scheduled               pod/postgres-stset-0                                           Successfully assigned database/postgres-stset-0 to aks-nodepool1-32045435-vmss000001
-21m         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Claim postgres-data-storage-postgres-stset-0 Pod postgres-stset-0 in StatefulSet postgres-stset success
-21m         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
-18m         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
-6m16s       Normal    SuccessfulDelete        statefulset/postgres-stset                                     delete Pod postgres-stset-0 in StatefulSet postgres-stset successful
-16s         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Claim postgres-data-storage-postgres-stset-0 Pod postgres-stset-0 in StatefulSet postgres-stset success
-16s         Normal    SuccessfulCreate        statefulset/postgres-stset                                     create Pod postgres-stset-0 in StatefulSet postgres-stset successful
-
-➜ k get statefulsets.apps
-NAME             READY   AGE
-postgres-stset   0/1     19m
+➜ cat ping-pong_application/manifests/ingress.yaml| grep number
+              number: 80
+              number: 80
+➜ k apply -f ping-pong_application/manifests/ingress.yaml
+ingress.networking.k8s.io/ping-pong-ingress configured
+➜ k get ingress
+NAME                CLASS                                HOSTS   ADDRESS        PORTS   AGE
+ping-pong-ingress   webapprouting.kubernetes.azure.com   *       9.223.19.249   80      10m
+➜ curl http://9.223.19.249/pingpong
+{"message":"pong 2","counter":2,"storage":"database"}%
 ```
 
-Something is still not working correctly. Check the logs of the pod.
+## Deploy Log Output application
+
+Add `ingressClassName: webapprouting.kubernetes.azure.com` to ingress and modify the service to expose port 80.
 
 ```bash
-➜ k logs -f postgres-stset-0
-Error from server (BadRequest): container "postgres" in pod "postgres-stset-0" is waiting to start: ContainerCreating
-```
+➜ kubens exercises
+Context "dwk-cluster" modified.
+Active namespace is "exercises".
 
-Seems that the pod is stuck in ContainerCreating. Check describe.
+➜ k apply -f log_output/manifests
+configmap/log-output-config configured
+deployment.apps/log-output-deployment created
+ingress.networking.k8s.io/log-output-ingress created
+service/log-output-svc created
 
-```bash
-➜ k describe pod postgres-stset-0
-Name:             postgres-stset-0
-Namespace:        database
+➜ k get pods
+NAME                                     READY   STATUS    RESTARTS   AGE
+log-output-deployment-7d6dd4cc78-vvtnh   0/2     Pending   0          6s
+ping-pong-deployment-688648f568-lxhsf    1/1     Running   0          66m
+
+➜ k describe pod log-output-deployment-7d6dd4cc78-vvtnh
+Name:             log-output-deployment-7d6dd4cc78-vvtnh
+Namespace:        exercises
 Priority:         0
 Service Account:  default
-Node:             aks-nodepool1-32045435-vmss000001/10.224.0.6
-Start Time:       Fri, 05 Sep 2025 14:38:50 +0200
-Labels:           app=postgres
-                  apps.kubernetes.io/pod-index=0
-                  controller-revision-hash=postgres-stset-8d59f486c
-                  statefulset.kubernetes.io/pod-name=postgres-stset-0
+Node:             <none>
+Labels:           app=logoutput
+                  pod-template-hash=7d6dd4cc78
 Annotations:      <none>
 Status:           Pending
 IP:
 IPs:              <none>
-Controlled By:    StatefulSet/postgres-stset
+Controlled By:    ReplicaSet/log-output-deployment-7d6dd4cc78
 Containers:
-  postgres:
-    Container ID:
-    Image:          postgres:17.6
-    Image ID:
-    Port:           5432/TCP
-    Host Port:      0/TCP
-    State:          Waiting
-      Reason:       ContainerCreating
-    Ready:          False
-    Restart Count:  0
-    Environment Variables from:
-      postgres-secrets  Secret  Optional: false
-    Environment:        <none>
+  log-reader:
+    Image:      docker.io/pjmartin/log-reader:2.5@sha256:86ee4ee17cf89270263d11d1cfcb7fb94e500768a21f379a04b793d10c1e0d4d
+    Port:       3000/TCP
+    Host Port:  0/TCP
+    Environment:
+      DATA_ROOT:    /app/data
+      CONFIG_ROOT:  /app/config
+      MESSAGE:      <set to the key 'MESSAGE' of config map 'log-output-config'>  Optional: false
     Mounts:
-      /data from postgres-data-storage (rw)
-      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-dwnj2 (ro)
+      /app/config/ from config-volume (rw)
+      /app/data from shared-storage (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-drs9n (ro)
+  log-writer:
+    Image:      docker.io/pjmartin/log-writer:2.3@sha256:6bb942841a896eb784f8e8c6c05b8d517ff272e2c03ae58ae372e08d0e01d1db
+    Port:       <none>
+    Host Port:  <none>
+    Environment:
+      DATA_ROOT:  /app/data
+    Mounts:
+      /app/data from shared-storage (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-drs9n (ro)
 Conditions:
-  Type                        Status
-  PodReadyToStartContainers   False
-  Initialized                 True
-  Ready                       False
-  ContainersReady             False
-  PodScheduled                True
+  Type           Status
+  PodScheduled   False
 Volumes:
-  postgres-data-storage:
+  shared-storage:
     Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
-    ClaimName:  postgres-data-storage-postgres-stset-0
+    ClaimName:  shared-volume-claim-0
     ReadOnly:   false
-  kube-api-access-dwnj2:
+  config-volume:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      log-output-config
+    Optional:  false
+  kube-api-access-drs9n:
     Type:                    Projected (a volume that contains injected data from multiple sources)
     TokenExpirationSeconds:  3607
     ConfigMapName:           kube-root-ca.crt
@@ -146,212 +198,281 @@ Node-Selectors:              <none>
 Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
                              node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
 Events:
-  Type    Reason                  Age   From                     Message
-  ----    ------                  ----  ----                     -------
-  Normal  Scheduled               26m   default-scheduler        Successfully assigned database/postgres-stset-0 to aks-nodepool1-32045435-vmss000001
-  Normal  SuccessfulAttachVolume  26m   attachdetach-controller  AttachVolume.Attach succeeded for volume "pvc-0ccd6737-66b6-4326-9548-3f70cf05d7a3"
-  Normal  Pulling                 26m   kubelet                  Pulling image "postgres:17.6"
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  42s   default-scheduler  0/5 nodes are available: persistentvolumeclaim "shared-volume-claim-0" not found. preemption: 0/5 nodes are available: 5 Preemption is not helpful for scheduling.
 ```
 
-Pod is stuck at pulling the image. I will try to change the image to be fully qualified and redeploy.
+Pod wont start since the PVC is missing, i will instead create a managed-csi volume that log output can use.
 
 ```bash
-➜ k delete statefulsets.apps postgres-stset
-statefulset.apps "postgres-stset" deleted
+➜ cat log_output/manifests/deployment.yaml|head -12
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-volume
+  namespace: exercises
+spec:
+  storageClassName: managed-csi
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 
-➜ cat postgres/manifests/postgres-stset.yaml |grep image
-          image: docker.io/library/postgres:17.6
+➜ k apply -f log_output/manifests
+configmap/log-output-config unchanged
+persistentvolumeclaim/shared-volume created
+deployment.apps/log-output-deployment configured
+ingress.networking.k8s.io/log-output-ingress unchanged
+service/log-output-svc unchanged
 
-➜ ./script/deploy-postgres.sh.sh
-secret/postgres-secrets unchanged
-service/postgres-svc unchanged
-statefulset.apps/postgres-stset created
+➜  k describe pod log-output-deployment-76c94d7d7b-jv97j | sed -n '/Events/,$p'
+Events:
+  Type    Reason                  Age    From                     Message
+  ----    ------                  ----   ----                     -------
+  Normal  Scheduled               2m17s  default-scheduler        Successfully assigned exercises/log-output-deployment-76c94d7d7b-jv97j to aks-nodepool1-29835372-vmss000001
+  Normal  SuccessfulAttachVolume  2m3s   attachdetach-controller  AttachVolume.Attach succeeded for volume "pvc-e3728fa2-ae4b-4dd8-b389-cd1ca5623511"
+  Normal  Pulling                 2m1s   kubelet                  Pulling image "docker.io/pjmartin/log-reader:3.2@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb"
+  Normal  Pulled                  115s   kubelet                  Successfully pulled image "docker.io/pjmartin/log-reader:3.2@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb" in 5.388s (5.388s including waiting). Image size: 54776893 bytes.
+  Normal  Created                 115s   kubelet                  Created container: log-reader
+  Normal  Started                 115s   kubelet                  Started container log-reader
+  Normal  Pulling                 115s   kubelet                  Pulling image "docker.io/pjmartin/log-writer:3.2@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243"
+  Normal  Pulled                  113s   kubelet                  Successfully pulled image "docker.io/pjmartin/log-writer:3.2@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243" in 2.365s (2.365s including waiting). Image size: 54776640 bytes.
+  Normal  Created                 113s   kubelet                  Created container: log-writer
+  Normal  Started                 113s   kubelet                  Started container log-writer
 
-➜ k logs -f postgres-stset-0
-The files belonging to this database system will be owned by user "postgres".
-This user must also own the server process.
-
-The database cluster will be initialized with locale "en_US.utf8".
-The default database encoding has accordingly been set to "UTF8".
-The default text search configuration will be set to "english".
-
-Data page checksums are disabled.
-
-fixing permissions on existing directory /var/lib/postgresql/data ... ok
-creating subdirectories ... ok
-selecting dynamic shared memory implementation ... posix
-selecting default "max_connections" ... 100
-selecting default "shared_buffers" ... 128MB
-selecting default time zone ... Etc/UTC
-creating configuration files ... ok
-running bootstrap script ... ok
-performing post-bootstrap initialization ... ok
-syncing data to disk ... ok
-
-
-Success. You can now start the database server using:
-
-    pg_ctl -D /var/lib/postgresql/data -l logfile start
-
-initdb: warning: enabling "trust" authentication for local connections
-initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
-waiting for server to start....2025-09-05 14:11:28.531 UTC [48] LOG:  starting PostgreSQL 17.6 (Debian 17.6-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
-2025-09-05 14:11:28.537 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
-2025-09-05 14:11:28.551 UTC [51] LOG:  database system was shut down at 2025-09-05 14:11:28 UTC
-2025-09-05 14:11:28.562 UTC [48] LOG:  database system is ready to accept connections
- done
-server started
-
-/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
-
-2025-09-05 14:11:28.641 UTC [48] LOG:  received fast shutdown request
-waiting for server to shut down....2025-09-05 14:11:28.648 UTC [48] LOG:  aborting any active transactions
-2025-09-05 14:11:28.650 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
-2025-09-05 14:11:28.653 UTC [49] LOG:  shutting down
-2025-09-05 14:11:28.657 UTC [49] LOG:  checkpoint starting: shutdown immediate
-2025-09-05 14:11:28.679 UTC [49] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.006 s, sync=0.003 s, total=0.026 s; sync files=2, longest=0.002 s, average=0.002 s; distance=0 kB, estimate=0 kB; lsn=0/14ED7B8, redo lsn=0/14ED7B8
-2025-09-05 14:11:28.683 UTC [48] LOG:  database system is shut down
- done
-server stopped
-
-PostgreSQL init process complete; ready for start up.
-
-2025-09-05 14:11:28.773 UTC [1] LOG:  starting PostgreSQL 17.6 (Debian 17.6-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
-2025-09-05 14:11:28.773 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
-2025-09-05 14:11:28.774 UTC [1] LOG:  listening on IPv6 address "::", port 5432
-2025-09-05 14:11:28.783 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
-2025-09-05 14:11:28.795 UTC [62] LOG:  database system was shut down at 2025-09-05 14:11:28 UTC
-2025-09-05 14:11:28.805 UTC [1] LOG:  database system is ready to accept connections
-```
-Success!
-
-## Deploy ping pong application
-
-Since im taking up and down the cluster i created some deployment scripts in `./script` to make my life easier.
-
-Deploy ping pong application.
-
-```bash
-➜ chmod +x ./script/deploy-ping-pong.sh
-➜ ./script/deploy-ping-pong.sh
-namespace/exercises created
-secret/ping-pong-secrets created
-configmap/log-output-config created
-deployment.apps/ping-pong-deployment created
-service/ping-pong-svc created
-ingress.networking.k8s.io/ping-pong-ingress created
 ➜ k get pods
-NAME                                    READY   STATUS         RESTARTS   AGE
-ping-pong-deployment-6b5ff4bbbd-kwbmb   0/1     ErrImagePull   0          38s
-➜ k logs -f ping-pong-deployment-6b5ff4bbbd-kwbmb
-Error from server (BadRequest): container "pingpong" in pod "ping-pong-deployment-6b5ff4bbbd-kwbmb" is waiting to start: trying and failing to pull image
-```
-
-Seems i have missed to build x86_64 image. Build and push it to docker hub.
-
-```bash
-  Normal   Pulling    10s (x2 over 27s)  kubelet            Pulling image "docker.io/pjmartin/pingpong:3.1@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1"
-  Warning  Failed     8s (x2 over 25s)   kubelet            Failed to pull image "docker.io/pjmartin/pingpong:3.1@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1": rpc error: code = NotFound desc = failed to pull and unpack image "docker.io/pjmartin/pingpong@sha256:f4c4760b32123fee8a16259044015923eee9c6e0b029cd9ab6fdf8e6b4ac09e1": no match for platform in manifest: not found
-  Warning  Failed     8s (x2 over 25s)   kubelet            Error: ErrImagePull
-```
-
-- *no match for platform in manifest: not found*
-
-My docker images were built for my local Arm64 M1 mac AKS cluster. I need to build it for the AKS linux/amd64 cluster. So i updated the `./script/build-and-push.sh` script to use buildx and build for multiple platforms.
-
-```bash
-./script/build-and-push.sh 3.1
-....
-=== Log Output ===
-arm64: docker.io/pjmartin/todo-app:3.1@sha256:ee93cba07a0c1cf1558b090eb0f97f8a6e2ba370dc857cec2d53950c179282e8
-arm64: docker.io/pjmartin/pingpong:3.1@sha256:633f80a0b884708c0ef64e9ddebef032e47b3a781eac5c5cfb6cfba53d87f3ec
-arm64: docker.io/pjmartin/log-reader:3.1@sha256:342c2cd3d47cf81a5b2c7b4f59ea79207785669e895ecfe64b51dcd1dffca078
-arm64: docker.io/pjmartin/log-writer:3.1@sha256:eab3fe1c8829d21b7124139dacd2cbe163cb3eb7672d2d3617cbabae2db0ac5e
-arm64: docker.io/pjmartin/todo-backend:3.1@sha256:dee0334cc0de64ccabd2a135df794225299052db9c827218e0790bda1b8044da
-x86_64: docker.io/pjmartin/todo-app:3.1@sha256:c3001c69fbe7b57dd814ced1fd3c5dfb48df33309926f9de16c822c40f87b886
-x86_64: docker.io/pjmartin/pingpong:3.1@sha256:ad21bf3ec6916a88f0bb7f03cf6fd27e85d347437c7c56ecb98f91ffa015f2c9
-x86_64: docker.io/pjmartin/log-reader:3.1@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb
-x86_64: docker.io/pjmartin/log-writer:3.1@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243
-x86_64: docker.io/pjmartin/todo-backend:3.1@sha256:cd7c89eb4a6e210f4af4f30f242651b4180fab16bcc57682f71c9e65c1682f75
-
-Multi-architecture build complete!
-Images built for: linux/amd64, linux/arm64
-These images will work on both ARM64 (local) and x86_64 (AKS) systems.
-```
-
-```bash
-➜ ./script/postgres.sh apply
-Applying postgres resources to namespace database...
-Error from server (AlreadyExists): namespaces "database" already exists
-secret/postgres-secrets created
-service/postgres-svc created
-statefulset.apps/postgres-stset created
-
-➜ ./script/ping-pong.sh apply
-Applying resources to namespace exercises...
-Error from server (AlreadyExists): namespaces "exercises" already exists
-secret/ping-pong-secrets created
-configmap/log-output-config created
-deployment.apps/ping-pong-deployment created
-service/ping-pong-svc created
-ingress.networking.k8s.io/ping-pong-ingress created
-
-➜ k get pods -n exercises
-NAME                                    READY   STATUS    RESTARTS   AGE
-ping-pong-deployment-688648f568-h2vp2   1/1     Running   0          25s
-
-➜ k logs -n exercises -f ping-pong-deployment-688648f568-h2vp2
-INFO:     Started server process [7]
-INFO:     Waiting for application startup.
-2025-09-08 09:33:21,065 INFO File logging enabled to /app/data/logs/ping-pong-app.log
-2025-09-08 09:33:21,065 INFO Attempting to connect to database: postgresql://postgres:***@postgres-svc.database:5432/postgres
-2025-09-08 09:33:21,452 INFO Connected to database postgresql://postgres:********@postgres-svc.database:5432/postgres
-2025-09-08 09:33:21,452 INFO Connected to PostgreSQL database
-2025-09-08 09:33:21,457 INFO Database connectivity test successful: 1
-2025-09-08 09:33:21,466 INFO Ping-pong table created or already exists
-2025-09-08 09:33:21,469 INFO Current records in ping_pong table: 0
-2025-09-08 09:33:21,475 INFO Initialized ping-pong counter in database with value 0
-2025-09-08 09:33:21,475 INFO Database initialization successful - using PostgreSQL
-2025-09-08 09:33:21,475 INFO Ping-pong server started on port 3000
-2025-09-08 09:33:21,475 INFO App instance hash: cJi6hm
-2025-09-08 09:33:21,475 INFO Storage mode: PostgreSQL
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
-^C%
+NAME                                     READY   STATUS    RESTARTS   AGE
+log-output-deployment-76c94d7d7b-jv97j   2/2     Running   0          2m49s
+ping-pong-deployment-688648f568-lxhsf    1/1     Running   0          87m
 
 ➜ k get ingress
-NAME                CLASS    HOSTS   ADDRESS   PORTS   AGE
-ping-pong-ingress   <none>   *                 80      41s
+NAME                 CLASS                                HOSTS   ADDRESS        PORTS   AGE
+log-output-ingress   webapprouting.kubernetes.azure.com   *       9.223.19.249   80      20m
+ping-pong-ingress    webapprouting.kubernetes.azure.com   *       9.223.19.249   80      87m
 
-➜ k get svc
-NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
-ping-pong-svc   ClusterIP   10.0.166.78   <none>        2345/TCP   2m19s
+➜ curl http://9.223.19.249/logs
+HTTP Server ID: c42f7566-54b0-44c6-bdbe-1110d895b3ce
+<br>file content: NEW MESSAGE IN FILE!
+
+<br>env variable: Hello Message variable!
+<br>Ping / Pongs: unavailable
+</br></br>2025-09-08 13:10:17,677 - INFO - server id: n239QlA567 - hash: mr4IcoVPhU
+<br>2025-09-08 13:10:22,678 - INFO - server id: n239QlA567 - hash: UJcVAQEUNg
+<br>2025-09-08 13:10:27,678 - INFO - server id: n239QlA567 - hash: yDY8jIr7ct
+<br>2025-09-08 13:10:32,679 - INFO - server id: n239QlA567 - hash: pxKySdHJFj
+<br>2025-09-08 13:10:37,679 - INFO - server id: n239QlA567 - hash: dlAEMV55t3
+<br>2025-09-08 13:10:42,679 - INFO - server id: n239QlA567 - hash: miAghvmp3N
+<br>2025-09-08 13:10:47,680 - INFO - server id: n239QlA567 - hash: iQQSvbLzlY
+<br>2025-09-08 13:10:52,681 - INFO - server id: n239QlA567 - hash: IkVA5xvuVo
+<br>2025-09-08 13:10:57,681 - INFO - server id: n239QlA567 - hash: RnLs0n6hC6
+<br>2025-09-08 13:11:02,682 - INFO - server id: n239QlA567 - hash: sAWyQV6MHr
+<br>%
 ```
 
-Now everything is up and running but i forgot to change the SVC type to LoadBalancer. I will redeploy the pingpong app with LoadBalancer type.
+The /pings endpoint seems to be unavailable after the ping pong service is listetning on port 80 instead of previously 2345.
+I will update the config map with correct URL and redeploy.
+(Testing a new command to rollout and restart applications)
 
 ```bash
-➜ ./script/ping-pong.sh apply
-Applying resources to namespace exercises...
-Error from server (AlreadyExists): namespaces "exercises" already exists
-secret/ping-pong-secrets unchanged
-configmap/log-output-config unchanged
-deployment.apps/ping-pong-deployment unchanged
-service/ping-pong-svc configured
-ingress.networking.k8s.io/ping-pong-ingress unchanged
+➜ k apply -f log_output/manifests/configmap.yaml
+configmap/log-output-config configured
 
-➜ k get svc --watch
-NAME            TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
-ping-pong-svc   LoadBalancer   10.0.166.78   <pending>     80:32340/TCP   4m4s
-ping-pong-svc   LoadBalancer   10.0.166.78   135.225.2.178   80:32340/TCP   4m5s
+➜ k rollout restart deployment log-output-deployment
+deployment.apps/log-output-deployment restarted
+
+➜ k get pods
+NAME                                     READY   STATUS              RESTARTS   AGE
+log-output-deployment-76c94d7d7b-jv97j   2/2     Running             0          7m30s
+log-output-deployment-b55868d8b-d4856    0/2     ContainerCreating   0          28s
+ping-pong-deployment-688648f568-lxhsf    1/1     Running             0          91m
 ```
 
-Now i can access the ping pong application using the external IP.
+Since the managed-csi volume only can attach to one node at a time, the new pod is stuck in ContainerCreating state.
 
 ```bash
-➜ curl http://135.225.2.178/pingpong
-{"message":"pong 0","counter":0,"storage":"database"}%
-➜ curl http://135.225.2.178/pingpong
-{"message":"pong 1","counter":1,"storage":"database"}%
+➜ k describe pod log-output-deployment-b55868d8b-d4856 | sed -n '/Events/,$p'
+Events:
+  Type     Reason              Age    From                     Message
+  ----     ------              ----   ----                     -------
+  Normal   Scheduled           4m13s  default-scheduler        Successfully assigned exercises/log-output-deployment-b55868d8b-d4856 to aks-nodepool1-29835372-vmss000000
+  Warning  FailedAttachVolume  4m14s  attachdetach-controller  Multi-Attach error for volume "pvc-e3728fa2-ae4b-4dd8-b389-cd1ca5623511" Volume is already used by pod(s) log-output-deployment-76c94d7d7b-jv97j
 ```
 
+The pods have ended up on different nodes.
+
+```bash
+➜ k describe pod log-output-deployment-b55868d8b-d4856 | grep "Node:"
+Node:             aks-nodepool1-29835372-vmss000000/10.224.0.5
+➜ k describe pod log-output-deployment-76c94d7d7b-jv97j |grep "Node:"
+Node:             aks-nodepool1-29835372-vmss000001/10.224.0.4
+```
+
+I will change the rollout strategy to `Recreate` so that only one pod is active at a time.
+It took a while for the old pod to terminate, but eventually the new pod started.
+
+```bash
+➜ k apply -f log_output/manifests/deployment.yaml
+persistentvolumeclaim/shared-volume unchanged
+deployment.apps/log-output-deployment configured
+
+➜ k get pods
+NAME                                     READY   STATUS              RESTARTS   AGE
+log-output-deployment-76c94d7d7b-jv97j   2/2     Terminating         0          13m
+log-output-deployment-b55868d8b-d4856    0/2     ContainerCreating   0          6m45s
+ping-pong-deployment-688648f568-lxhsf    1/1     Running             0          98m
+
+➜ k get pods log-output-deployment-b55868d8b-d4856
+NAME                                    READY   STATUS              RESTARTS   AGE
+log-output-deployment-b55868d8b-d4856   0/2     ContainerCreating   0          8m30s
+
+➜ k get pods log-output-deployment-b55868d8b-d4856
+NAME                                    READY   STATUS    RESTARTS   AGE
+log-output-deployment-b55868d8b-d4856   2/2     Running   0          10m
+
+ k describe pod log-output-deployment-b55868d8b-d4856 | sed -n '/Events/,$p'
+Events:
+  Type     Reason                  Age    From                     Message
+  ----     ------                  ----   ----                     -------
+  Normal   Scheduled               16m    default-scheduler        Successfully assigned exercises/log-output-deployment-b55868d8b-d4856 to aks-nodepool1-29835372-vmss000000
+  Warning  FailedAttachVolume      16m    attachdetach-controller  Multi-Attach error for volume "pvc-e3728fa2-ae4b-4dd8-b389-cd1ca5623511" Volume is already used by pod(s) log-output-deployment-76c94d7d7b-jv97j
+  Normal   SuccessfulAttachVolume  9m13s  attachdetach-controller  AttachVolume.Attach succeeded for volume "pvc-e3728fa2-ae4b-4dd8-b389-cd1ca5623511"
+  Normal   Pulling                 9m11s  kubelet                  Pulling image "docker.io/pjmartin/log-reader:3.2@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb"
+  Normal   Pulled                  7m26s  kubelet                  Successfully pulled image "docker.io/pjmartin/log-reader:3.2@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb" in 1m44.956s (1m44.956s including waiting). Image size: 54776893 bytes.
+  Normal   Created                 7m26s  kubelet                  Created container: log-reader
+  Normal   Started                 7m26s  kubelet                  Started container log-reader
+  Normal   Pulling                 7m26s  kubelet                  Pulling image "docker.io/pjmartin/log-writer:3.2@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243"
+  Normal   Pulled                  7m24s  kubelet                  Successfully pulled image "docker.io/pjmartin/log-writer:3.2@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243" in 2.378s (2.378s including waiting). Image size: 54776640 bytes.
+  Normal   Created                 7m24s  kubelet                  Created container: log-writer
+  Normal   Started                 7m24s  kubelet                  Started container log-writer
+```
+
+There are still issues getting the pongs from the ping pong service that is deployed in the same namespace.
+
+```bash
+➜ curl http://9.223.19.249/logs
+HTTP Server ID: a9dd3628-ac7e-4515-903c-432337dd2241
+<br>file content: NEW MESSAGE IN FILE!
+
+<br>env variable: Hello Message variable!
+<br>Ping / Pongs: unavailable
+</br></br>2025-09-08 13:33:38,696 - INFO - server id: Hoa3igT8iX - hash: GdEgrx5vbH
+<br>2025-09-08 13:33:43,697 - INFO - server id: Hoa3igT8iX - hash: e7UwhKLHaq
+<br>2025-09-08 13:33:48,697 - INFO - server id: Hoa3igT8iX - hash: iwyJrymdzF
+<br>2025-09-08 13:33:53,697 - INFO - server id: Hoa3igT8iX - hash: owCTfsMAki
+<br>2025-09-08 13:33:58,698 - INFO - server id: Hoa3igT8iX - hash: 5S7YX0fYdO
+<br>2025-09-08 13:34:03,698 - INFO - server id: Hoa3igT8iX - hash: FPLb66Yy7G
+<br>2025-09-08 13:34:08,698 - INFO - server id: Hoa3igT8iX - hash: pKfCo7pusM
+<br>2025-09-08 13:34:13,701 - INFO - server id: Hoa3igT8iX - hash: Ld6NVFv7IV
+<br>2025-09-08 13:34:18,704 - INFO - server id: Hoa3igT8iX - hash: 8hDgFXi83a
+<br>2025-09-08 13:34:23,705 - INFO - server id: Hoa3igT8iX - hash: ErSNc6n7oi
+<br>%
+```
+
+Check application logs.:
+
+```bash
+k logs -f log-output-deployment-b55868d8b-d4856
+Defaulted container "log-reader" out of: log-reader, log-writer
+2025-09-08 13:26:11,373 INFO File logging enabled to /app/data/logs/log-reader.log
+2025-09-08 13:26:11,376 INFO Log reader server started on port 3000
+2025-09-08 13:26:11,376 INFO App instance hash: a9dd3628-ac7e-4515-903c-432337dd2241
+ * Serving Flask app 'log-reader'
+ * Debug mode: off
+2025-09-08 13:26:11,379 INFO WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://10.244.0.163:3000
+2025-09-08 13:26:11,379 INFO Press CTRL+C to quit
+2025-09-08 13:28:05,971 ERROR Error calling ping-pong service: HTTPConnectionPool(host='ping-pong-svc', port=2345): Max retries exceeded with url: /pings (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f8b47316440>, 'Connection to ping-pong-svc timed out. (connect timeout=2)'))
+2025-09-08 13:28:05,977 INFO 10.244.4.170 - - [08/Sep/2025 13:28:05] "GET /logs HTTP/1.1" 200 -
+2025-09-08 13:34:24,893 ERROR Error calling ping-pong service: HTTPConnectionPool(host='ping-pong-svc', port=2345): Max retries exceeded with url: /pings (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x7f8b47315630>, 'Connection to ping-pong-svc timed out. (connect timeout=2)'))
+2025-09-08 13:34:24,894 INFO 10.244.3.100 - - [08/Sep/2025 13:34:24] "GET /logs HTTP/1.1" 200 -
+```
+
+Logs show that the new variable in configmap is not picked up, and the port is still 2345.
+It seems that the deployment has specified that only the key MESSAGE should be injected as environment variable.
+I will change it to inject all keys from the configmap instead.
+
+
+old config map config:
+```yaml
+            - name: MESSAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: log-output-config
+                  key: MESSAGE
+```
+
+new configmap config to get all keys in configmap:
+```yaml
+          envFrom:
+            - configMapRef:
+                name: log-output-config
+```
+
+Lets apply the change and test if logs can reach ping pong service.
+
+```bash
+➜ k apply -f log_output/manifests/deployment.yaml
+persistentvolumeclaim/shared-volume unchanged
+deployment.apps/log-output-deployment configured
+➜ k get pods
+NAME                                     READY   STATUS        RESTARTS   AGE
+log-output-deployment-867655d88c-wvsfz   2/2     Terminating   0          4m45s
+my-busybox                               1/1     Running       0          18m
+ping-pong-deployment-688648f568-lxhsf    1/1     Running       0          131m
+➜ k get pods
+NAME                                     READY   STATUS    RESTARTS   AGE
+log-output-deployment-54db948cf8-lc7g6   2/2     Running   0          95s
+my-busybox                               1/1     Running   0          19m
+ping-pong-deployment-688648f568-lxhsf    1/1     Running   0          132m
+➜ curl http://9.223.19.249/logs
+HTTP Server ID: 94915492-aaba-47e2-9216-8d8dd364a76c
+<br>file content: NEW MESSAGE IN FILE!
+
+<br>env variable: Hello Message variable!
+<br>Ping / Pongs: 3
+</br></br>2025-09-08 13:57:28,155 - INFO - server id: kTbV0Tf44Z - hash: RyUAw6jYYq
+<br>2025-09-08 13:57:33,155 - INFO - server id: kTbV0Tf44Z - hash: LWbY4IZSQL
+<br>2025-09-08 13:57:38,156 - INFO - server id: kTbV0Tf44Z - hash: zbYaANDb4T
+<br>2025-09-08 13:57:43,156 - INFO - server id: kTbV0Tf44Z - hash: gFdP7PDOYb
+<br>2025-09-08 13:57:48,156 - INFO - server id: kTbV0Tf44Z - hash: 9Ip5yDVeFE
+<br>2025-09-08 13:57:53,157 - INFO - server id: kTbV0Tf44Z - hash: pNewzpm2ec
+<br>2025-09-08 13:57:58,157 - INFO - server id: kTbV0Tf44Z - hash: v62dmA8Q04
+<br>2025-09-08 13:58:03,158 - INFO - server id: kTbV0Tf44Z - hash: loREZAC1a7
+<br>2025-09-08 13:58:08,161 - INFO - server id: kTbV0Tf44Z - hash: el6ZZkP1oq
+<br>2025-09-08 13:58:13,162 - INFO - server id: kTbV0Tf44Z - hash: nSB0cblPac
+<br>%
+
+➜ k logs -f log-output-deployment-54db948cf8-lc7g6
+Defaulted container "log-reader" out of: log-reader, log-writer
+2025-09-08 13:56:48,230 INFO File logging enabled to /app/data/logs/log-reader.log
+2025-09-08 13:56:48,231 INFO Log reader server started on port 3000
+2025-09-08 13:56:48,231 INFO App instance hash: 94915492-aaba-47e2-9216-8d8dd364a76c
+ * Serving Flask app 'log-reader'
+ * Debug mode: off
+2025-09-08 13:56:48,233 INFO WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://10.244.0.148:3000
+2025-09-08 13:56:48,233 INFO Press CTRL+C to quit
+2025-09-08 13:58:17,740 INFO 10.244.3.100 - - [08/Sep/2025 13:58:17] "GET /logs HTTP/1.1" 200 -
+```
+
+It Works!
+
+- I added namespace to each manifest file so i dont deploy it to wrong namespace by mistake
+- Also notice a copy paste error where ping-pong-config was named log-output-config in the deployment file.
+
+
+Deleting cluster with my script:
+
+```bash
+➜ ./script/aks-cluster.sh delete
+Deleting AKS cluster dwk-cluster from resource group rg-aks-mooc-001...
+AKS cluster deletion initiated (running in background)
+```
+
+Current AKS usage: 17.04 SEK

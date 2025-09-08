@@ -1,9 +1,25 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-volume
+  namespace: exercises
+spec:
+  storageClassName: managed-csi
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: log-output-deployment
+  namespace: exercises
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: logoutput
@@ -15,13 +31,13 @@ spec:
       volumes:
         - name: shared-storage
           persistentVolumeClaim:
-            claimName: shared-volume-claim-0
+            claimName: shared-volume
         - name: config-volume
           configMap:
             name: log-output-config
       containers:
         - name: log-reader
-          image: docker.io/pjmartin/log-reader:2.5@sha256:86ee4ee17cf89270263d11d1cfcb7fb94e500768a21f379a04b793d10c1e0d4d
+          image: docker.io/pjmartin/log-reader:3.2@sha256:3fd3fcbb749acfe030004ff33d8c01feee671f2cc3e30a5ec2cb5fd902c69ddb
           ports:
             - name: http
               containerPort: 3000
@@ -35,13 +51,12 @@ spec:
               value: "/app/data"
             - name: CONFIG_ROOT
               value: "/app/config"
-            - name: MESSAGE
-              valueFrom:
-                configMapKeyRef:
-                  name: log-output-config
-                  key: MESSAGE
+          envFrom:
+            - configMapRef:
+                name: log-output-config
+
         - name: log-writer
-          image: docker.io/pjmartin/log-writer:2.3@sha256:6bb942841a896eb784f8e8c6c05b8d517ff272e2c03ae58ae372e08d0e01d1db
+          image: docker.io/pjmartin/log-writer:3.2@sha256:bdd18ca3cccb288a7f7532d26876e4874fa771f00fc8e37d7fbf32e1b95a0243
           volumeMounts:
             - name: shared-storage
               mountPath: /app/data

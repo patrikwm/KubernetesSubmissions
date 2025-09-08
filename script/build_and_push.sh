@@ -1,18 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./build_and_push.sh 1.12
-# This will build and push all images with the tag :1.12 for both ARM64 and x86_64
+# Usage:
+# ./build_and_push.sh <tag> [app1,app2,...]
+# ./build_and_push.sh 1.12                    # Build all apps
+# ./build_and_push.sh 1.12 pingpong          # Build only pingpong
+# ./build_and_push.sh 1.12 pingpong,todo-app # Build pingpong and todo-app
 
-if [ $# -ne 1 ]; then
-  echo "Usage: $0 <tag>"
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  echo "Usage: $0 <tag> [app1,app2,...]"
+  echo ""
+  echo "Available apps: todo-app, pingpong, log-reader, log-writer, todo-backend"
+  echo ""
+  echo "Examples:"
+  echo "  $0 1.12                    # Build all apps"
+  echo "  $0 1.12 pingpong          # Build only pingpong"
+  echo "  $0 1.12 pingpong,todo-app # Build pingpong and todo-app"
   exit 1
 fi
 
 TAG=$1
+SELECTED_APPS=${2:-"all"}
 REPO="pjmartin"
 
 echo "Building and pushing multi-architecture images with tag: $TAG"
+
+if [ "$SELECTED_APPS" = "all" ]; then
+  echo "Building all applications..."
+else
+  echo "Building selected applications: $SELECTED_APPS"
+fi
 
 # Create and use a new buildx builder instance for multi-arch builds
 echo "Setting up Docker buildx for multi-architecture builds..."
@@ -25,7 +42,7 @@ declare -a X86_64_IMAGES=()
 
 # Define applications to build
 # Format: "image_name:build_context:dockerfile_path"
-APPS=(
+ALL_APPS=(
   "todo-app:./todo-app:"
   "pingpong:./ping-pong_application:"
   "log-reader:./log_output:./log_output/Dockerfile.read"
@@ -33,8 +50,42 @@ APPS=(
   "todo-backend:./todo-backend:"
 )
 
+# Function to check if an app should be built
+should_build_app() {
+  local app_name=$1
+  if [ "$SELECTED_APPS" = "all" ]; then
+    return 0
+  fi
+
+  # Convert comma-separated list to array and check if app is in the list
+  IFS=',' read -ra SELECTED_APP_ARRAY <<< "$SELECTED_APPS"
+  for selected in "${SELECTED_APP_ARRAY[@]}"; do
+    if [ "$selected" = "$app_name" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Build selected applications
+APPS_TO_BUILD=()
+for app_config in "${ALL_APPS[@]}"; do
+  IFS=':' read -r image_name build_context dockerfile <<< "$app_config"
+  if should_build_app "$image_name"; then
+    APPS_TO_BUILD+=("$app_config")
+  fi
+done
+
+if [ ${#APPS_TO_BUILD[@]} -eq 0 ]; then
+  echo "Error: No valid applications selected"
+  echo "Available apps: todo-app, pingpong, log-reader, log-writer, todo-backend"
+  exit 1
+fi
+
+echo "Apps to build: ${#APPS_TO_BUILD[@]}"
+
 # Build and push each application
-for app_config in "${APPS[@]}"; do
+for app_config in "${APPS_TO_BUILD[@]}"; do
   IFS=':' read -r image_name build_context dockerfile <<< "$app_config"
 
   echo "=> Building multi-arch $image_name"

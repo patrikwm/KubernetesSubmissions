@@ -2,7 +2,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: log-output-config
+  name: ping-pong-config
+  namespace: exercises
 data:
    DATA_ROOT:           "/app/data"
    POSTGRES_HOST:       "postgres-svc.database"
@@ -15,6 +16,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ping-pong-deployment
+  namespace: exercises
 spec:
   replicas: 1
   selector:
@@ -31,6 +33,6 @@ spec:
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
-                name: log-output-config
+                name: ping-pong-config
             - secretRef:
                 name: ping-pong-secrets
