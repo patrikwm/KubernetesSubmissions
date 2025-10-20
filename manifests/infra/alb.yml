@@ -1,0 +1,8 @@
+apiVersion: alb.networking.azure.io/v1
+kind: ApplicationLoadBalancer
+metadata:
+  name: alb-demo
+  namespace: alb-infra
+spec:
+  associations:
+  - /subscriptions/56d9a591-8bfe-40fb-96a4-17b3ec30d23a/resourceGroups/rg-aks-mooc-001/providers/Microsoft.Network/virtualNetworks/vnet-dwk-cluster/subnets/alb-subnet
