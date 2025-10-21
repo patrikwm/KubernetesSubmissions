@@ -36,3 +36,9 @@ spec:
                 name: ping-pong-config
             - secretRef:
                 name: ping-pong-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 5
