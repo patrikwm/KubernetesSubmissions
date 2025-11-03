@@ -1,64 +1,121 @@
-# Kubectl Deployment Process
+# Kubernetes Deployment Flow
 
-## Overview
+When you run `kubectl apply -f deployment.yaml`, Kubernetes translates the manifest into API requests and the control plane works to make the cluster match that desired state. The sequence below highlights the major hops from your terminal to running containers.
 
-When you run the command `kubectl create deployment`, several components in the Kubernetes architecture work together to create and manage the deployment. Below is a simplified diagram illustrating the flow of actions that occur during this process:
+## High-Level Sequence
 
-```bash
-kubectl → sends HTTPS request with the yaml/json payload
-   │
-   ▼
-Kubernetes API Server
-   ├─ Authenticates user (kubeconfig)
-   ├─ Runs admission & validation webhooks
-   ├─ Writes object to etcd
-   └─ Responds to kubectl: "Created"
+1. `kubectl` loads credentials, validates the manifest, and sends an HTTPS request to the Kubernetes API.
+2. The API server authenticates the request, authorizes it, runs admission controllers, and persists the new objects to `etcd`.
+3. Control-plane controllers detect the new desired state and begin reconciling it by creating or updating subordinate objects.
+4. The scheduler assigns each pending Pod to an appropriate Node.
+5. The kubelet on the target node pulls images, mounts configuration, starts containers, and reports status back through the API server.
 
-Meanwhile...
-   │
-   ▼
-Controllers (Deployment, ReplicaSet, Scheduler)
-   ├─ Watch API for new Deployments
-   ├─ Create ReplicaSet + Pods
-   └─ Assign Pods to Nodes
+> kubectl → API Server → etcd → Controllers → Scheduler → Kubelet → API Server
 
-kubelet (on nodes)
-   └─ Starts containers
-```
+## Component Responsibilities
 
-## Kubectl
+### kubectl (client)
 
-`kubectl` is the command-line tool used to interact with the Kubernetes API server. When you run `kubectl create deployment`, it constructs an HTTPS request containing the deployment specification in YAML or JSON format and sends it to the API server.
+- Reads cluster context and credentials from `~/.kube/config`.
+- Performs basic manifest validation before sending it.
+- Issues REST calls (POST, PATCH, DELETE) to the API server and prints the response.
 
-## Kubernetes API Server
+### Kubernetes API Server (front door)
 
-The API server is the central management entity that processes requests from `kubectl` and other clients. Upon receiving the deployment request, it performs several actions:
-1. **Authentication**: Verifies the identity of the user making the request using credentials from the kubeconfig file.
-2. **Admission Control & Validation**: Runs any configured admission controllers and validation webhooks to ensure the request complies with cluster policies. Validates CRDs if applicable.
-3. **Persistence**: Writes the deployment object to etcd, the cluster's backing store.
-4. **Response**: Sends a response back to `kubectl` confirming the creation of the deployment.
+- Authenticates the caller and checks RBAC/ABAC permissions.
+- Runs admission controllers (mutating & validating webhooks, defaulting).
+- Persists resources in `etcd`, establishing the cluster’s desired state.
+- Returns the result (`Created`, `Configured`, `Forbidden`, etc.) to `kubectl`.
 
-## etcd
+### etcd (source of truth)
 
-`etcd` is a distributed key-value store that serves as the persistent storage for all cluster data. When the API server writes the deployment object to etcd, it ensures that the desired state of the cluster is recorded and can be retrieved later.
+- Stores every Kubernetes object in a strongly consistent key/value store.
+- Enables controllers to compare the desired state (stored in `etcd`) with the observed cluster state.
 
-## Controllers
+### Controller Manager (continuous reconciliation)
 
-A controller is just a control loop — a small program that:
-	1.	Watches the API Server for objects of a certain kind (e.g. Deployment, Pod, Service).
-	2.	Compares the actual cluster state with the desired state in etcd.
-	3.	Takes action if there’s a difference (e.g. create, delete, or modify resources).
+- Runs control loops that watch the API server and adjust objects until desired state matches reality.
 
 ```bash
-while true:
-    desired = get_from_etcd()
-    actual = observe_cluster()
-    if desired != actual:
-        make_them_match()
+┌──────────────────────────────┐
+│ kube-controller-manager      │
+│ ├─ DeploymentController      │
+│ ├─ ReplicaSetController      │
+│ ├─ StatefulSetController     │
+│ ├─ DaemonSetController       │
+│ ├─ JobController             │
+│ ├─ CronJobController         │
+│ ├─ ServiceAccountController  │
+│ ├─ NodeController            │
+│ ├─ EndpointsController       │
+│ ├─ NamespaceController       │
+│ ├─ PVController (Volumes)    │
+│ ├─ PVCController             │
+│ ├─ ServiceController         │
+│ ├─ HorizontalPodAutoscaler   │
+│ ├─ TTLController             │
+│ └─ GarbageCollector          │
+└──────────────────────────────┘
 ```
 
+#### Deployment controller
 
-Controllers are split into two main categories:
+- Watches for new or updated Deployments.
+- Creates or updates ReplicaSets to match `.spec.replicas` and the Pod template.
 
-1. **Built-in Controllers**: These are part of the Kubernetes control plane and include controllers for Deployments, ReplicaSets, DaemonSets, StatefulSets, etc.
-2. **Custom Controllers**: These are user-defined controllers that can manage custom resources (CRDs) or extend Kubernetes functionality.
+#### ReplicaSet controller
+
+- Ensures the ReplicaSet has the requested number of Pods.
+- Creates or deletes Pods so that the actual count matches the desired count.
+
+### Scheduler
+
+- Watches for Pods without a `spec.nodeName`.
+- Scores nodes based on capacity, taints, affinities, and policies.
+- Binds each Pod to the chosen node by writing the `nodeName` back to the API server.
+
+### Kubelet (node agent)
+
+- Watches for Pods scheduled to its node.
+- Creates the Pod sandbox via the container runtime (CRI).
+- Invokes the CNI plugin to obtain networking for each Pod.
+- Mounts ConfigMaps and Secrets, pulls images, and starts containers.
+- Reports Pod status transitions (Pending → Running → Succeeded/Failed) back to the API server.
+
+### ConfigMaps & Secrets
+
+When referenced by a Deployment (via `env`, `envFrom`, or volumes):
+
+- The kubelet fetches the data from the API server.
+- It projects the values into the Pod as environment variables or mounted files.
+- Mounted volumes automatically refresh when the ConfigMap or Secret changes.
+
+## Lifecycle of a Deployment
+
+1. **Deployment created** – The Deployment object is stored in `etcd`. No Pods exist yet.
+2. **ReplicaSet generated** – The Deployment controller creates (or updates) a ReplicaSet that matches the template.
+3. **Pods created** – The ReplicaSet controller notices missing Pods and creates Pod objects.
+4. **Pods scheduled** – The scheduler assigns each Pod to a node by setting `spec.nodeName`.
+5. **Pods realized** – The kubelet on each selected node pulls images, mounts configuration, and starts containers.
+6. **Status reported** – The kubelet reports progress back to the API server, where `kubectl get pods` can observe it.
+7. **Ongoing reconciliation** – Scaling, rolling updates, or crashes trigger controllers to repeat the loop until desired = actual.
+
+## Ownership Hierarchy
+
+| Level | Resource   | Managed By             |
+|-------|------------|------------------------|
+| 1     | Deployment | User (via `kubectl`)   |
+| 2     | ReplicaSet | Deployment controller  |
+| 3     | Pod        | ReplicaSet controller  |
+| 4     | Container  | Kubelet / container runtime |
+
+## Key Takeaways
+
+- Kubernetes reacts to API state: controllers watch `etcd` and continuously reconcile differences.
+- The scheduler chooses placement; the kubelet makes that placement real.
+- Deployments orchestrate ReplicaSets, and ReplicaSets orchestrate Pods.
+- ConfigMaps and Secrets flow through the API server to the kubelet, which injects them into containers.
+- `kubectl get` commands reflect the status reported by kubelets through the API server back into `etcd`.
+
+
+
