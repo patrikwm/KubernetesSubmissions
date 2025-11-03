@@ -5,26 +5,25 @@ Scripts for setting up Azure Kubernetes Service (AKS) with Application Gateway f
 ## 🚀 Quick Start
 
 ```bash
-# 0. Validate network configuration (optional but recommended)
+# 0. (Optional) Validate address spaces and CIDRs
 ./00-0-check-network-config.sh
 
-# 1. Create network infrastructure (VNet + subnets)
+# 1. Provision network infrastructure (VNet + subnets)
 ./00-1-create-network.sh
 
-# 2. Create AKS cluster in the network
+# 2. Create AKS cluster inside the prepared subnet
 ./00-2-create-cluster.sh
 
-# 3. Install ALB Controller
+# 3a. (Recommended) Install Azure Application Gateway for Containers
 ./02-1-enable-alb.sh
-
-# 4. Configure ALB subnet permissions
 ./02-2-create-alb.sh
 
-# 5. Verify setup
+# 3b. (Alternative) Enable the NGINX ingress controller instead of ALB
+./01-1-enable-ingress.sh
+
+# 4. Verify everything is healthy
 ./verify-alb-setup.sh
 ```
-
-Then follow the deployment instructions in `QUICK-START.sh`.
 
 ## 📁 Files
 
@@ -33,16 +32,12 @@ Then follow the deployment instructions in `QUICK-START.sh`.
 | `config.sh` | Shared configuration (region, resource names, **network settings**) |
 | `00-0-check-network-config.sh` | **Validates network configuration (sanity checks)** |
 | `00-1-create-network.sh` | **Creates VNet and subnets (run first!)** |
-| `00-2-create-cluster.sh` | Creates AKS cluster in pre-created network |
-| `01-1-enable-ingress.sh` | Enables NGINX ingress (alternative to ALB) |
-| `02-1-enable-alb.sh` | Installs ALB Controller with proper RBAC |
-| `02-2-create-alb.sh` | Configures ALB subnet permissions |
-| `verify-alb-setup.sh` | Verifies all prerequisites are met |
-| `cleanup.sh` | Deletes all resources |
-| `QUICK-START.sh` | Quick reference for deployment |
-| `CHANGES-SUMMARY.md` | Summary of recent updates |
-| `ALB-SETUP-NOTES.md` | Detailed technical documentation |
-| `NETWORK-PLANNING.md` | **Network architecture and sizing guide** |
+| `00-2-create-cluster.sh` | Creates the AKS cluster using the BYO network |
+| `01-1-enable-ingress.sh` | Installs the NGINX ingress controller (optional) |
+| `02-1-enable-alb.sh` | Installs the Azure ALB controller and managed identity |
+| `02-2-create-alb.sh` | Grants ALB identity permissions on the subnet |
+| `verify-alb-setup.sh` | Runs post-install validation checks |
+| `cleanup.sh` | Tears down the cluster and supporting resources |
 
 ## ⚙️ Configuration
 
@@ -132,44 +127,37 @@ Creates AKS cluster with:
 
 **Requires:** Network must exist (run `00-1-create-network.sh` first)
 
-### 00-create-cluster.sh
-Creates AKS cluster with:
-- **Region:** North Europe (required for ALB)
-- **Network:** Uses pre-created VNet and AKS subnet via `--vnet-subnet-id`
-- **Network Plugin:** Azure CNI (pods get IPs from subnet)
-- **Features:** OIDC Issuer, Workload Identity
-- **Nodes:** 3x Standard_B2s
+### 01-1-enable-ingress.sh (optional)
 
-**Requires:** Network must exist (run `00-create-network.sh` first)
+Installs the NGINX ingress controller for scenarios where ALB is not required.
+- Deploys the ingress resources into the cluster.
+- Useful for local testing or lab scenarios.
+- Can be skipped when using Azure ALB.
 
 ### 02-1-enable-alb.sh
-Installs ALB Controller:
-- Creates managed identity
-- Assigns **3 RBAC roles**:
-  - Reader (on managed RG)
-  - AppGW Configuration Manager (on managed RG)
-  - Network Contributor (on ALB subnet - done in 02-2)
-- Sets up OIDC federation
-- Installs Gateway API CRDs
-- Installs Helm chart (v1.7.12)
+
+Installs Azure Application Gateway for Containers (ALB) controller:
+- Creates and configures the managed identity.
+- Assigns RBAC roles on the managed resource group.
+- Sets up OIDC federation for workload identity.
+- Installs Gateway API CRDs and the ALB Helm chart (v1.7.12).
 
 ### 02-2-create-alb.sh
-Configures ALB subnet permissions:
-- Verifies ALB subnet exists and is properly delegated
-- Assigns Network Contributor role on subnet to managed identity
-- **Much simpler now** since network is pre-created
 
-**Requires:** Network created, ALB Controller installed
+Configures ALB subnet permissions:
+- Verifies the ALB subnet exists and is properly delegated.
+- Assigns the Network Contributor role on the subnet to the managed identity.
+- Outputs the subnet resource ID for use in Gateway manifests.
+
+**Requires:** Network created and ALB controller installed.
 
 ### verify-alb-setup.sh
-Checks:
-- ✓ Cluster in correct region
-- ✓ OIDC and Workload Identity enabled
-- ✓ Managed identity exists
-- ✓ All RBAC roles assigned
-- ✓ ALB Controller pods running
-- ✓ GatewayClass created
-- ✓ ALB subnet configured
+
+Runs a series of checks to confirm the cluster is ready for Gateway deployments:
+- Validates AKS region and feature flags (OIDC, Workload Identity).
+- Confirms the managed identity and RBAC assignments.
+- Checks ALB controller pods and Gateway resources.
+- Ensures the ALB subnet is properly configured.
 
 ## 📊 Network Architecture
 
@@ -322,11 +310,8 @@ az role assignment list --assignee $principalId --output table
 
 ## 📚 Documentation
 
-- **BYO-NETWORK.md** - Why we create network first (BYO approach) ⭐ NEW
-- **NETWORK-PLANNING.md** - Network architecture and subnet sizing guide
-- **ALB-SETUP-NOTES.md** - Detailed technical documentation
-- **CHANGES-SUMMARY.md** - What changed from old scripts
-- **QUICK-START.sh** - Quick reference commands
+- Review the comments in each script for flags and environment requirements.
+- `config.sh` contains the canonical values used across every script.
 
 ## 🧹 Cleanup
 
@@ -349,10 +334,10 @@ This will:
 
 ## 🆘 Need Help?
 
-1. Run `./verify-alb-setup.sh` to check configuration
-2. Check controller logs: `kubectl logs -n azure-alb-system -l app=alb-controller`
-3. See detailed docs in `ALB-SETUP-NOTES.md`
-4. Review what changed in `CHANGES-SUMMARY.md`
+1. Run `./verify-alb-setup.sh` to check configuration.
+2. Inspect controller logs: `kubectl logs -n azure-alb-system -l app=alb-controller`.
+3. Re-run `./00-0-check-network-config.sh` to validate your CIDR choices.
+4. Consult the Microsoft documentation linked above for feature-specific guidance.
 
 ---
 

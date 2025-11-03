@@ -1,6 +1,6 @@
 # Chapter 4
 
-# Exercise: 3.3. To the Gateway
+## Exercise: 3.3. To the Gateway
 
 - To use gateway with AKS you need to use Azure Application Gateway for Containers (ALB).
 - ALB is more complex to set up but has more features and better integration with Azure.
@@ -12,7 +12,9 @@
 - The Kubernetes Cluster needs to have OIDC issuer enabled.
 
 
-## Network setup
+Since im deleting the cluster at the end of each day i will create a script to automate the process.
 
-Since the network setup is complex, i will use the provided scripts to create the network and cluster.
+
+## Script descriptions
+
 
