@@ -36,14 +36,51 @@
 - [AKS cluster setup](https://github.com/patrikwm/KubernetesSubmissions/tree/3.0/aks-cluster/)
 - [3.1.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.1/ping-pong_application/)
 - [3.2.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.2/ping-pong_application/)
+- [3.3.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.3/ping-pong_application/)
 
 
 ## Scripts
 
-- Setup AKS Cluster: `./script/setup-aks-cluster.sh`
-- Delete AKS Cluster: `./script/delete-aks-cluster.sh`
-- Update deployments: `./script/update-deployments.sh <deployment-name> <image-version>`
-- Deploy Postgres: `./script/deploy-postgres.sh`
+Scripts are organized by purpose under the [`scripts/`](scripts/) directory.
+
+### Infrastructure Scripts
+
+Located in [`scripts/infrastructure/`](scripts/infrastructure/):
+
+- [`config.sh`](scripts/infrastructure/config.sh) — Shared configuration for all infrastructure scripts.
+- [`00-0-check-network-config.sh`](scripts/infrastructure/00-0-check-network-config.sh) — Validate network configuration and CIDR ranges.
+- [`00-1-create-network.sh`](scripts/infrastructure/00-1-create-network.sh) — Create VNet and subnets for AKS.
+- [`00-2-create-cluster.sh`](scripts/infrastructure/00-2-create-cluster.sh) — Create the AKS cluster.
+- [`01-1-enable-ingress.sh`](scripts/infrastructure/01-1-enable-ingress.sh) — Enable NGINX ingress controller.
+- [`02-1-enable-alb.sh`](scripts/infrastructure/02-1-enable-alb.sh) — Enable Application Gateway for Containers (ALB).
+- [`02-2-create-alb.sh`](scripts/infrastructure/02-2-create-alb.sh) — Configure ALB subnet permissions.
+- [`03-1-create-namespaces.sh`](scripts/infrastructure/03-1-create-namespaces.sh) — Create Kubernetes namespaces.
+- [`verify-alb-setup.sh`](scripts/infrastructure/verify-alb-setup.sh) — Verify ALB installation and configuration.
+- [`cleanup.sh`](scripts/infrastructure/cleanup.sh) — Delete the cluster and all resources.
+
+### Application Deployment Scripts
+
+Located in [`scripts/apps/`](scripts/apps/):
+
+- [`deploy-postgres.sh`](scripts/apps/deploy-postgres.sh) — Deploy PostgreSQL StatefulSet.
+- [`deploy-ping-pong.sh`](scripts/apps/deploy-ping-pong.sh) — Deploy the ping-pong application.
+- [`deploy-log-output.sh`](scripts/apps/deploy-log-output.sh) — Deploy the log output application.
+- [`deploy-todo-app.sh`](scripts/apps/deploy-todo-app.sh) — Deploy the todo frontend.
+- [`deploy-todo-backend.sh`](scripts/apps/deploy-todo-backend.sh) — Deploy the todo backend with CronJob.
+
+### Development Scripts
+
+Located in [`scripts/dev/`](scripts/dev/):
+
+- [`setup-venv.sh`](scripts/dev/setup-venv.sh) — Create and configure Python virtual environment for testing.
+- [`run-tests.sh`](scripts/dev/run-tests.sh) — Run automated tests for deployed applications.
+- [`port-forward.sh`](scripts/dev/port-forward.sh) — Forward Kubernetes services to localhost for local development.
+
+### Quick Reference
+
+See [`scripts/QUICKREF.md`](scripts/QUICKREF.md) for a condensed command reference.
+
+For detailed usage instructions, see [`scripts/README.md`](scripts/README.md).
 
 
 ## Notes
@@ -67,3 +104,10 @@ A ping-pong application with one endpoint. Saves output to LOG_FILE environment 
 endpoint: `/`
 
 Todo application with one endpoint. Outputs an app instance hash and a user request hash. Uses DATA_DIR environment variable or ../image-downloader/.data by default to store data.
+
+
+### Export sops key
+
+```bash
+export SOPS_AGE_KEY_FILE=$(pwd)/key.txt
+```
