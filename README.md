@@ -37,6 +37,7 @@
 - [3.1.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.1/ping-pong_application/)
 - [3.2.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.2/ping-pong_application/)
 - [3.3.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.3/ping-pong_application/)
+- [3.4.](https://github.com/patrikwm/KubernetesSubmissions/tree/3.4/ping-pong_application/)
 
 
 ## Scripts
