@@ -198,7 +198,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: alb.networking.azure.io/v1
 kind: ApplicationLoadBalancer
 metadata:
-  name: alb-demo
+  name: alb-gateway
   namespace: alb-infra
 spec:
   associations:

@@ -62,18 +62,38 @@ echo ""
 # Check 4: Role Assignments
 echo "✓ Checking RBAC role assignments..."
 principalId=$(az identity show -g "$RESOURCE_GROUP" -n "$IDENTITY_RESOURCE_NAME" --query principalId -o tsv)
-ROLE_COUNT=$(az role assignment list --assignee "$principalId" --query "length(@)" -o tsv)
 
-if [ "$ROLE_COUNT" -lt 3 ]; then
-    log_warn "Only $ROLE_COUNT role(s) assigned - expected 3!"
-    echo "  Required roles:"
-    echo "    - Reader"
-    echo "    - AppGW for Containers Configuration Manager"
-    echo "    - Network Contributor (on ALB subnet)"
-    echo "  Run: ./02-1-enable-alb.sh and ./02-2-create-alb.sh"
+# Managed (node) RG scope
+MC_RG=$(az aks show -g "$RESOURCE_GROUP" -n "$AKS_NAME" --query nodeResourceGroup -o tsv)
+MC_RG_ID=$(az group show -n "$MC_RG" --query id -o tsv)
+
+# ALB subnet resource ID (derive from cluster VNet or use your known VNet/ALB names)
+CLUSTER_SUBNET_ID=$(az vmss list -g "$MC_RG" --query '[0].virtualMachineProfile.networkProfile.networkInterfaceConfigurations[0].ipConfigurations[0].subnet.id' -o tsv 2>/dev/null || echo "NOT_FOUND")
+VNET_ID=${CLUSTER_SUBNET_ID%/subnets/*}
+VNET_RG=$(echo "$VNET_ID" | cut -d'/' -f5)
+VNET_NAME=$(echo "$VNET_ID" | cut -d'/' -f9)
+ALB_SUBNET_ID=$(az network vnet subnet show -g "$VNET_RG" --vnet-name "$VNET_NAME" -n "alb-subnet" --query id -o tsv 2>/dev/null || echo "NOT_FOUND")
+
+missing=0
+
+has_reader=$(az role assignment list --assignee "$principalId" --scope "$MC_RG_ID" --query "[?roleDefinitionId.ends_with(@, 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]" -o tsv)
+[[ -n "$has_reader" ]] || { log_warn "Missing Reader on $MC_RG"; missing=$((missing+1)); }
+
+has_cfgmgr=$(az role assignment list --assignee "$principalId" --scope "$MC_RG_ID" --query "[?roleDefinitionId.ends_with(@, 'fbc52c3f-28ad-4303-a892-8a056630b8f1')]" -o tsv)
+[[ -n "$has_cfgmgr" ]] || { log_warn "Missing AppGW for Containers Configuration Manager on $MC_RG"; missing=$((missing+1)); }
+
+if [[ "$ALB_SUBNET_ID" != "NOT_FOUND" ]]; then
+  has_netcontrib=$(az role assignment list --assignee "$principalId" --scope "$ALB_SUBNET_ID" --query "[?roleDefinitionId.ends_with(@, '4d97b98b-1d4f-4787-a291-c67834d212e7')]" -o tsv)
+  [[ -n "$has_netcontrib" ]] || { log_warn "Missing Network Contributor on ALB subnet"; missing=$((missing+1)); }
 else
-    log_info "RBAC roles assigned: $ROLE_COUNT ✓"
-    az role assignment list --assignee "$principalId" --query "[].{Role:roleDefinitionName, Scope:scope}" -o table
+  log_warn "ALB subnet not found while verifying role assignments"
+  missing=$((missing+1))
+fi
+
+if [[ $missing -eq 0 ]]; then
+  log_info "RBAC roles present ✓"
+else
+  log_warn "RBAC incomplete ($missing missing). Run ./02-1-enable-alb.sh and ./02-2-create-alb.sh"
 fi
 echo ""
 
@@ -144,14 +164,13 @@ else
 fi
 echo ""
 
-# Check 8: Helm release
+# --- Check 8: Helm release (in azure-alb-system) ---
 echo "✓ Checking Helm release..."
-if helm list -n azure-alb-helm 2>/dev/null | grep -q "alb-controller"; then
-    HELM_VERSION=$(helm list -n azure-alb-helm -o json 2>/dev/null | grep -o '"app_version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-    log_info "Helm release installed (version: $HELM_VERSION) ✓"
+if helm list -n azure-alb-system 2>/dev/null | grep -q "alb-controller"; then
+  HELM_VERSION=$(helm list -n azure-alb-system -o json 2>/dev/null | grep -o '"app_version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+  log_info "Helm release installed (version: $HELM_VERSION) ✓"
 else
-    log_warn "Helm release not found"
-    echo "  Expected in namespace: azure-alb-helm"
+  log_warn "Helm release not found in azure-alb-system"
 fi
 echo ""
 

@@ -59,8 +59,18 @@ az identity create \
     2>/dev/null || log_info "Identity already exists"
 principalId="$(az identity show -g "$RESOURCE_GROUP" -n "$IDENTITY_RESOURCE_NAME" --query principalId -otsv)"
 
-log_warn "Waiting 60 seconds for identity replication..."
-sleep 60
+log_info "Waiting for identity replication and role assignments..."
+for i in {1..12}; do
+  if az role assignment list \
+        --assignee "$principalId" \
+        --scope "$mcResourceGroupId" \
+        --query "[].id" -o tsv | grep -q .; then
+    log_info "✓ Identity replication verified."
+    break
+  fi
+  log_warn "  Waiting for replication... ($i/12)"
+  sleep 10
+done
 
 # Assign Reader role
 log_info "Assigning Reader role to managed resource group..."
@@ -94,15 +104,16 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/downloa
 
 # Install ALB Controller via Helm
 log_info "Installing ALB Controller via Helm..."
-HELM_NAMESPACE='azure-alb-helm'
+HELM_NAMESPACE='azure-alb-system'
 CONTROLLER_NAMESPACE='azure-alb-system'
 clientId=$(az identity show -g "$RESOURCE_GROUP" -n azure-alb-identity --query clientId -o tsv)
 
 helm upgrade --install alb-controller oci://mcr.microsoft.com/application-lb/charts/alb-controller \
     --namespace "$HELM_NAMESPACE" --create-namespace \
-    --version 1.7.12 \
+    --version 1.8.12 \
     --set albController.namespace="$CONTROLLER_NAMESPACE" \
     --set albController.podIdentity.clientID="$clientId" \
+    --set albController.serviceAccount.name="alb-controller-sa" \
     --set-json 'definitions.imagePullSecret=null' \
     --skip-schema-validation
 
