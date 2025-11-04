@@ -4,7 +4,7 @@ metadata:
   name: gateway-01
   namespace: exercises
   annotations:
-    alb.networking.azure.io/alb-name: alb-demo
+    alb.networking.azure.io/alb-name: alb-gateway
     alb.networking.azure.io/alb-namespace: alb-infra
 spec:
   gatewayClassName: azure-alb-external
