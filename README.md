@@ -112,3 +112,8 @@ Todo application with one endpoint. Outputs an app instance hash and a user requ
 ```bash
 export SOPS_AGE_KEY_FILE=$(pwd)/key.txt
 ```
+
+
+## Links
+
+- [Azure ](https://medium.com/@anandctx/aks-ingress-load-balancer-how-it-works-e6c5bb6530f7)
